@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const crypto = require('crypto');
 const { Server } = require('socket.io');
 
 const app = express();
@@ -27,18 +28,54 @@ const BOT_NAMES = ['Chintu 🤖', 'Bunty 🤖', 'Guddu 🤖', 'Pinki 🤖', 'Mon
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 4; i++) code += chars[randInt(chars.length)];
   if (rooms.has(code)) return genCode();
   return code;
+}
+
+// Cryptographically-strong random int in [0, max)
+function randInt(max) {
+  return crypto.randomInt(max);
+}
+
+function pickRandom(arr) {
+  return arr[randInt(arr.length)];
 }
 
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randInt(i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// Deal chits so nobody gets the same role two rounds in a row (whenever
+// possible). Pure Math.random() streaks made repeats feel rigged, so we
+// re-shuffle until the deal differs from last round for every seated player.
+function dealRoles(room) {
+  const base = ['raja', 'mantri', 'chor', 'sipahi'];
+  let best = shuffle(base);
+  let bestRepeats = countRepeats(room, best);
+  for (let t = 1; t < 60 && bestRepeats > 0; t++) {
+    const s = shuffle(base);
+    const r = countRepeats(room, s);
+    if (r < bestRepeats) { best = s; bestRepeats = r; }
+  }
+  const roles = {};
+  room.players.forEach((p, i) => { roles[p.id] = best[i]; });
+  room.lastRoles = roles;
+  return roles;
+}
+
+function countRepeats(room, deal) {
+  if (!room.lastRoles) return 0;
+  let n = 0;
+  room.players.forEach((p, i) => {
+    if (room.lastRoles[p.id] === deal[i]) n++;
+  });
+  return n;
 }
 
 function publicPlayers(room) {
@@ -84,10 +121,8 @@ function startRound(room) {
   room.status = 'reveal';
   room.currentRound += 1;
 
-  // assign roles randomly to the 4 seats
-  const roles = shuffle(['raja', 'mantri', 'chor', 'sipahi']);
-  room.roles = {};
-  room.players.forEach((p, i) => { room.roles[p.id] = roles[i]; });
+  // deal chits fairly: crypto-shuffled, nobody repeats last round's role
+  room.roles = dealRoles(room);
   room.guess = null;
   room.result = null;
 
@@ -139,13 +174,13 @@ function openGuessPhase(room) {
   // bot sipahi auto-guesses
   if (sipahi.isBot) {
     room.botTimer = setTimeout(() => {
-      const pick = suspects[Math.floor(Math.random() * suspects.length)];
+      const pick = pickRandom(suspects);
       resolveGuess(room, sipahi.id, pick.id, true);
-    }, 3000 + Math.random() * 2000);
+    }, 3000 + randInt(2000));
   } else {
     // human timeout -> random auto guess
     room.guessTimer = setTimeout(() => {
-      const pick = suspects[Math.floor(Math.random() * suspects.length)];
+      const pick = pickRandom(suspects);
       resolveGuess(room, sipahi.id, pick.id, true);
     }, GUESS_SECONDS * 1000);
   }
@@ -221,7 +256,7 @@ io.on('connection', (socket) => {
       code, hostId: playerId, status: 'lobby',
       totalRounds, currentRound: 0,
       players: [{ id: playerId, socketId: socket.id, name, isBot: false, score: 0, connected: true }],
-      roles: {}, guess: null, result: null,
+      roles: {}, lastRoles: null, guess: null, result: null,
       revealTimer: null, guessTimer: null, botTimer: null
     };
     rooms.set(code, room);
@@ -266,7 +301,7 @@ io.on('connection', (socket) => {
     if (socket.data.playerId !== room.hostId) return;
     if (room.players.length >= 4) return socket.emit('errorMsg', 'Room already has 4 players.');
     const used = new Set(room.players.map(p => p.name));
-    const botName = BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + Math.floor(Math.random() * 900 + 100) + ' 🤖');
+    const botName = BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + (100 + randInt(900)) + ' 🤖');
     const botId = 'p_' + Math.random().toString(36).slice(2, 9);
     room.players.push({ id: botId, socketId: null, name: botName, isBot: true, score: 0, connected: true });
     broadcastLobby(room);
@@ -289,11 +324,12 @@ io.on('connection', (socket) => {
     // auto-fill with bots if fewer than 4
     while (room.players.length < 4) {
       const used = new Set(room.players.map(p => p.name));
-      const botName = BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + Math.floor(Math.random() * 900 + 100) + ' 🤖');
+      const botName = BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + (100 + randInt(900)) + ' 🤖');
       room.players.push({ id: 'p_' + Math.random().toString(36).slice(2, 9), socketId: null, name: botName, isBot: true, score: 0, connected: true });
     }
     room.players.forEach(p => { p.score = 0; });
     room.currentRound = 0;
+    room.lastRoles = null;
     broadcastPublicRooms();
     startRound(room);
   });
@@ -331,6 +367,7 @@ io.on('connection', (socket) => {
     if (socket.data.playerId !== room.hostId) return;
     room.players.forEach(p => { p.score = 0; });
     room.currentRound = 0;
+    room.lastRoles = null;
     room.status = 'lobby';
     broadcastLobby(room);
     broadcastPublicRooms();
@@ -381,7 +418,7 @@ io.on('connection', (socket) => {
           clearTimers(room);
           room.botTimer = setTimeout(() => {
             const suspects = room.players.filter(p => p.id !== sipahi.id);
-            const pick = suspects[Math.floor(Math.random() * suspects.length)];
+            const pick = pickRandom(suspects);
             resolveGuess(room, sipahi.id, pick.id, true);
           }, 2500);
         }
