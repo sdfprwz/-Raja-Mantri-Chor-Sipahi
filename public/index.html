@@ -12,6 +12,7 @@
 <header class="topbar">
   <div class="brand">👑 Raja · Mantri · Chor · Sipahi</div>
   <div class="top-right">
+    <a class="profile" href="https://github.com/sdfprwz" target="_blank" rel="noopener" title="Made by sdfprwz">👤 sdfprwz</a>
     <span id="connDot" class="dot online"></span><span id="connText">connected</span>
   </div>
 </header>
@@ -131,9 +132,20 @@
   </section>
 
   <div id="toast" class="toast"></div>
+
+  <!-- CHAT -->
+  <button id="chatFab" class="chat-fab hidden" title="Room chat">💬<span id="chatBadge" class="chat-badge hidden">0</span></button>
+  <div id="chatPanel" class="chat-panel hidden">
+    <div class="chat-head"><b>💬 Room chat</b><button id="chatClose" class="btn small">✕</button></div>
+    <div id="chatMsgs" class="chat-msgs"></div>
+    <div class="chat-input">
+      <input id="chatText" maxlength="300" placeholder="Type a message…" autocomplete="off" />
+      <button id="chatSend" class="btn small primary">➤</button>
+    </div>
+  </div>
 </main>
 
-<footer class="foot">Made with ❤️ for the classic playground game · Raja 1000 · Mantri 800 · Sipahi/Chor 500/0</footer>
+<footer class="foot">Made with ❤️ by <a href="https://github.com/sdfprwz" target="_blank" rel="noopener">sdfprwz</a> · Raja 1000 · Mantri 800 · Sipahi/Chor 500/0</footer>
 <script src="client.js"></script>
 </body>
 </html>

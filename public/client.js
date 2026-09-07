@@ -73,6 +73,10 @@ socket.on('publicRooms', (list) => {
 socket.on('joined', (d) => {
   myId = d.playerId; myRoom = d.code;
   $('gCode').textContent = d.code;
+  $('chatMsgs').innerHTML = '';
+  unread = 0; updateBadge();
+  (d.chat || []).forEach(addChatMsg);
+  $('chatFab').classList.remove('hidden');
   show('screen-lobby');
 });
 socket.on('roomUpdate', (room) => {
@@ -342,6 +346,51 @@ $('btnAgain').onclick = () => {
   socket.emit('restartGame');
   show('screen-lobby');
 };
+
+// ---------- room chat ----------
+let chatOpen = false, unread = 0;
+function updateBadge() {
+  const b = $('chatBadge');
+  b.textContent = unread > 9 ? '9+' : unread;
+  b.classList.toggle('hidden', unread === 0);
+}
+function addChatMsg(m) {
+  const box = $('chatMsgs');
+  const div = document.createElement('div');
+  if (m.sys) {
+    div.className = 'cmsg sys';
+    div.textContent = m.text;
+  } else {
+    const mine = m.playerId === myId;
+    div.className = 'cmsg' + (mine ? ' mine' : '');
+    const time = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    div.innerHTML = `<div class="cname">${escapeHtml(m.name)} · ${time}</div><div class="ctext"></div>`;
+    div.querySelector('.ctext').textContent = m.text;
+  }
+  box.appendChild(div);
+  while (box.children.length > 50) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+socket.on('chatMsg', (m) => {
+  addChatMsg(m);
+  if (!chatOpen) { unread++; updateBadge(); }
+});
+function setChat(open) {
+  chatOpen = open;
+  $('chatPanel').classList.toggle('hidden', !open);
+  if (open) { unread = 0; updateBadge(); $('chatText').focus(); }
+}
+$('chatFab').onclick = () => setChat(!chatOpen);
+$('chatClose').onclick = () => setChat(false);
+function sendChat() {
+  const inp = $('chatText');
+  const text = inp.value.trim();
+  if (!text) return;
+  socket.emit('sendChat', { text });
+  inp.value = '';
+}
+$('chatSend').onclick = sendChat;
+$('chatText').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
 
 socket.on('errorMsg', (m) => toast(m));
 socket.on('connect', () => { $('connDot').className = 'dot online'; $('connText').textContent = 'connected'; });

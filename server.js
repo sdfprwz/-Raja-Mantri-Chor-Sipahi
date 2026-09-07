@@ -23,6 +23,8 @@ const rooms = new Map(); // code -> room
 const ROLE_POINTS = { raja: 1000, mantri: 800, sipahi: 500, chor: 0 };
 const REVEAL_SECONDS = 7;
 const GUESS_SECONDS = 30;
+const CHAT_MAXLEN = 300;
+const CHAT_HISTORY = 50;
 const BOT_NAMES = ['Chintu 🤖', 'Bunty 🤖', 'Guddu 🤖', 'Pinki 🤖', 'Monty 🤖'];
 
 function genCode() {
@@ -108,6 +110,17 @@ function broadcastPublicRooms() {
       host: (r.players.find(p => p.id === r.hostId) || {}).name || '—'
     }));
   io.emit('publicRooms', list);
+}
+
+// ---- Room chat (in-memory, last CHAT_HISTORY messages per room) ----
+function pushChat(room, msg) {
+  room.messages.push(msg);
+  if (room.messages.length > CHAT_HISTORY) room.messages.splice(0, room.messages.length - CHAT_HISTORY);
+  io.to(room.code).emit('chatMsg', msg);
+}
+
+function sysMsg(room, text) {
+  pushChat(room, { id: 'm_' + Date.now().toString(36) + randInt(1296).toString(36), sys: true, text, ts: Date.now() });
 }
 
 function clearTimers(room) {
@@ -215,6 +228,13 @@ function resolveGuess(room, sipahiId, suspectId, auto = false) {
   room.result = { correct, sipahiId, suspectId, auto, roles: rolesOut, round: room.currentRound };
   room.guess = { sipahiId, suspectId, correct, auto };
 
+  const sipahiName = (room.players.find(p => p.id === sipahiId) || {}).name || 'Sipahi';
+  const suspectName = (room.players.find(p => p.id === suspectId) || {}).name || '?';
+  const chorName = actualChor.name;
+  sysMsg(room, correct
+    ? `✅ ${sipahiName} caught ${chorName} (Chor)! Sipahi +500 🎉`
+    : `❌ ${sipahiName} accused ${suspectName} — real Chor was ${chorName}! Chor +500 😱`);
+
   io.to(room.code).emit('roundResult', {
     ...room.result,
     players: publicPlayers(room),
@@ -256,14 +276,15 @@ io.on('connection', (socket) => {
       code, hostId: playerId, status: 'lobby',
       totalRounds, currentRound: 0,
       players: [{ id: playerId, socketId: socket.id, name, isBot: false, score: 0, connected: true }],
-      roles: {}, lastRoles: null, guess: null, result: null,
+      roles: {}, lastRoles: null, guess: null, result: null, messages: [],
       revealTimer: null, guessTimer: null, botTimer: null
     };
     rooms.set(code, room);
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.playerId = playerId;
-    socket.emit('joined', { code, playerId, players: publicPlayers(room), hostId: playerId, totalRounds });
+    socket.emit('joined', { code, playerId, players: publicPlayers(room), hostId: playerId, totalRounds, chat: room.messages });
+    sysMsg(room, `👑 ${name} created the room — share the code to invite friends!`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -281,9 +302,23 @@ io.on('connection', (socket) => {
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
     socket.data.playerId = playerId;
-    socket.emit('joined', { code: roomCode, playerId, players: publicPlayers(room), hostId: room.hostId, totalRounds: room.totalRounds });
+    socket.emit('joined', { code: roomCode, playerId, players: publicPlayers(room), hostId: room.hostId, totalRounds: room.totalRounds, chat: room.messages });
+    sysMsg(room, `👋 ${name} joined the room (${room.players.length}/4)`);
     broadcastLobby(room);
     broadcastPublicRooms();
+  });
+
+  socket.on('sendChat', ({ text }) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room) return;
+    const me = room.players.find(p => p.id === socket.data.playerId && !p.isBot);
+    if (!me) return;
+    text = String(text || '').trim().slice(0, CHAT_MAXLEN);
+    if (!text) return;
+    pushChat(room, {
+      id: 'm_' + Date.now().toString(36) + randInt(1296).toString(36),
+      sys: false, playerId: me.id, name: me.name, text, ts: Date.now()
+    });
   });
 
   socket.on('updateSettings', ({ totalRounds }) => {
@@ -304,6 +339,7 @@ io.on('connection', (socket) => {
     const botName = BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + (100 + randInt(900)) + ' 🤖');
     const botId = 'p_' + Math.random().toString(36).slice(2, 9);
     room.players.push({ id: botId, socketId: null, name: botName, isBot: true, score: 0, connected: true });
+    sysMsg(room, `🤖 ${botName} joined the room`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -312,7 +348,9 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.status !== 'lobby') return;
     if (socket.data.playerId !== room.hostId) return;
+    const gone = room.players.find(p => p.id === botId && p.isBot);
     room.players = room.players.filter(p => !(p.id === botId && p.isBot));
+    if (gone) sysMsg(room, `🤖 ${gone.name} was removed`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -331,6 +369,7 @@ io.on('connection', (socket) => {
     room.currentRound = 0;
     room.lastRoles = null;
     broadcastPublicRooms();
+    sysMsg(room, `🎮 Game started — ${room.totalRounds} round(s). Good luck!`);
     startRound(room);
   });
 
@@ -354,6 +393,7 @@ io.on('connection', (socket) => {
         players: publicPlayers(room),
         winner: { id: sorted[0].id, name: sorted[0].name, score: sorted[0].score, isBot: sorted[0].isBot }
       });
+      sysMsg(room, `🏆 ${sorted[0].name} wins with ${sorted[0].score} pts! GG everyone 🎉`);
       broadcastLobby(room);
       broadcastPublicRooms();
     } else {
@@ -369,6 +409,7 @@ io.on('connection', (socket) => {
     room.currentRound = 0;
     room.lastRoles = null;
     room.status = 'lobby';
+    sysMsg(room, '🔁 Back to lobby — host can start a new game');
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -388,6 +429,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(code);
     const idx = room.players.findIndex(p => p.id === pid && !p.isBot);
     if (idx === -1) return;
+    const leaverName = room.players[idx].name;
     if (room.status === 'lobby') {
       room.players.splice(idx, 1);
       // host migration
@@ -399,6 +441,7 @@ io.on('connection', (socket) => {
         clearTimers(room);
         rooms.delete(code);
       } else {
+        sysMsg(room, `👋 ${leaverName} left the room`);
         broadcastLobby(room);
       }
     } else {
@@ -407,6 +450,7 @@ io.on('connection', (socket) => {
       room.players[idx].connected = false;
       room.players[idx].socketId = null;
       room.players[idx].name += ' (left)';
+      sysMsg(room, `⚠️ ${leaverName} disconnected — bot takes over`);
       if (room.hostId === pid) {
         const nextHuman = room.players.find(p => !p.isBot && p.connected !== false);
         if (nextHuman) room.hostId = nextHuman.id;

@@ -14,6 +14,7 @@ Traditional Indian chit game, now playable online with friends + bots.
 - 🔢 Host sets 1–10 rounds
 - ⏱ Sipahi 30s guess timer with auto-pick on timeout
 - ⭐ Live scoreboard, round reveal animation, winner podium
+- 💬 Room chat with game-event feed (joins, catches, winners)
 - 📱 Mobile responsive
 
 ## Run locally
