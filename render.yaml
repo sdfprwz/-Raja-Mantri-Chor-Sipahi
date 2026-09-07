@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: raja-mantri-chor-sipahi
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18

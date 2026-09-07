@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>👑 Raja Mantri Chor Sipahi — Online</title>
+<link rel="stylesheet" href="style.css" />
+<script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+<div class="bg-pattern"></div>
+<header class="topbar">
+  <div class="brand">👑 Raja · Mantri · Chor · Sipahi</div>
+  <div class="top-right">
+    <span id="connDot" class="dot online"></span><span id="connText">connected</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- HOME -->
+  <section id="screen-home" class="card">
+    <h1>👑 Raja Mantri Chor Sipahi</h1>
+    <p class="sub">The classic Indian chit game — now online with friends & bots!</p>
+    <div class="rules-mini">
+      <span>👑 Raja <b>1000</b></span><span>🎩 Mantri <b>800</b></span><span>🕵️ Sipahi <b>500 / 0</b></span><span>🥷 Chor <b>0 / 500</b></span>
+    </div>
+    <label class="lbl">Your name</label>
+    <input id="inName" maxlength="15" placeholder="e.g. Arjun" />
+    <div class="row">
+      <div class="grow">
+        <label class="lbl">Rounds (1–10)</label>
+        <select id="inRounds">
+          <option>1</option><option>3</option><option selected>5</option><option>7</option><option>10</option>
+        </select>
+      </div>
+      <div class="grow">
+        <label class="lbl">Room code (to join)</label>
+        <input id="inCode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase" />
+      </div>
+    </div>
+    <div class="row">
+      <button id="btnCreate" class="btn primary">✨ Create Room</button>
+      <button id="btnJoin" class="btn">🚪 Join Room</button>
+    </div>
+    <h3>🟢 Open rooms <button id="btnRefresh" class="btn small">↻</button></h3>
+    <div id="roomList" class="roomlist"><div class="muted">No open rooms — create one!</div></div>
+    <details class="how">
+      <summary>📜 How to play</summary>
+      <ol>
+        <li>4 chits — <b>Raja, Mantri, Chor, Sipahi</b> — are dealt secretly each round.</li>
+        <li>Your chit shows for <b>7 seconds</b> then hides (anti-sneak 👀). Use <b>Peek</b> to glance again briefly.</li>
+        <li><b>Sipahi</b> must catch the <b>Chor</b> by picking a suspect.</li>
+        <li>Correct guess → Sipahi <b>500</b>, Chor <b>0</b>. Wrong guess → swapped! Raja <b>1000</b>, Mantri <b>800</b> fixed.</li>
+        <li>Most points after all rounds wins 🏆. Short of 4 friends? Add bots 🤖.</li>
+      </ol>
+    </details>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="screen-lobby" class="card hidden">
+    <div class="roomhdr">
+      <h2>Room <span id="lbCode" class="code"></span></h2>
+      <div>
+        <button id="btnCopy" class="btn small">📋 Copy code</button>
+        <button id="btnLeave1" class="btn small danger">Leave</button>
+      </div>
+    </div>
+    <p class="muted" id="lbHint">Share the code with 3 friends. Host can add bots 🤖 to fill seats.</p>
+    <div id="lbPlayers" class="players"></div>
+    <div class="row" id="hostControls">
+      <div class="grow">
+        <label class="lbl">Total rounds</label>
+        <select id="lbRounds"></select>
+      </div>
+      <div class="grow" style="display:flex;align-items:flex-end;gap:8px">
+        <button id="btnAddBot" class="btn">🤖 Add bot</button>
+        <button id="btnStart" class="btn primary">▶ Start game</button>
+      </div>
+    </div>
+    <p class="muted" id="lbWait" style="display:none">Waiting for host to start… ⏳</p>
+  </section>
+
+  <!-- GAME -->
+  <section id="screen-game" class="card hidden">
+    <div class="roomhdr">
+      <h2 id="gRound">Round 1/5</h2>
+      <div><span id="gCode" class="code"></span>
+        <button id="btnLeave2" class="btn small danger">Leave</button>
+      </div>
+    </div>
+
+    <div id="scorebar" class="scorebar"></div>
+
+    <!-- chit -->
+    <div id="chitZone" class="chit-zone">
+      <div id="chitCard" class="chit">
+        <div id="chitEmoji" class="chit-emoji">❓</div>
+        <div id="chitName" class="chit-name">???</div>
+        <div id="chitPts" class="chit-pts"></div>
+      </div>
+      <div id="chitTimer" class="timer">7</div>
+      <p id="chitMsg" class="muted">Memorise your chit — it hides soon! 👀</p>
+      <button id="btnPeek" class="btn small" style="display:none">👁 Peek (2s)</button>
+    </div>
+
+    <!-- guess -->
+    <div id="guessZone" class="hidden">
+      <h3 id="guessTitle">🕵️ Sipahi is thinking…</h3>
+      <p class="muted" id="guessSub"></p>
+      <div id="suspects" class="suspects"></div>
+      <div id="guessTimerWrap">⏱ <span id="guessTimer">30</span>s left</div>
+    </div>
+
+    <!-- result -->
+    <div id="resultZone" class="hidden">
+      <h3 id="resTitle"></h3>
+      <div id="resCards" class="rescards"></div>
+      <div id="resTable"></div>
+      <button id="btnNext" class="btn primary">Next ➜</button>
+    </div>
+
+    <!-- game over -->
+    <div id="overZone" class="hidden">
+      <h2 id="overTitle">🏆 Game over!</h2>
+      <div id="podium" class="podium"></div>
+      <div class="row">
+        <button id="btnAgain" class="btn primary">🔁 Play again (lobby)</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+</main>
+
+<footer class="foot">Made with ❤️ for the classic playground game · Raja 1000 · Mantri 800 · Sipahi/Chor 500/0</footer>
+<script src="client.js"></script>
+</body>
+</html>
