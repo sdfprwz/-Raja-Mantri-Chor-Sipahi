@@ -13,6 +13,7 @@
   <div class="brand">👑 Raja · Mantri · Chor · Sipahi</div>
   <div class="top-right">
     <a class="profile" href="https://github.com/sdfprwz" target="_blank" rel="noopener" title="Made by sdfprwz">👤 sdfprwz</a>
+    <button id="btnSound" class="btn small sound-btn" title="Toggle sound">🔊</button>
     <span id="connDot" class="dot online"></span><span id="connText">connected</span>
   </div>
 </header>
@@ -30,10 +31,11 @@
     <input id="inName" maxlength="15" placeholder="e.g. Arjun" />
     <div class="row">
       <div class="grow">
-        <label class="lbl">Rounds (1–10)</label>
-        <select id="inRounds">
-          <option>1</option><option>3</option><option selected>5</option><option>7</option><option>10</option>
-        </select>
+        <label class="lbl">Rounds (1–500, or ♾️ endless)</label>
+        <div class="rounds-pick">
+          <input id="inRounds" type="number" min="1" max="500" step="1" value="5" />
+          <label class="endless-check"><input id="inEndless" type="checkbox" /> ♾️ Endless</label>
+        </div>
       </div>
       <div class="grow">
         <label class="lbl">Room code (to join)</label>
@@ -54,6 +56,7 @@
         <li><b>Sipahi</b> must catch the <b>Chor</b> by picking a suspect.</li>
         <li>Correct guess → Sipahi <b>500</b>, Chor <b>0</b>. Wrong guess → swapped! Raja <b>1000</b>, Mantri <b>800</b> fixed.</li>
         <li>Most points after all rounds wins 🏆. Short of 4 friends? Add bots 🤖.</li>
+        <li>Host picks <b>any 1–500 rounds, or ♾️ endless</b> — and can extend/shorten mid-game. 🔊 Sounds alert you: round start, chit hide, Sipahi turn, countdown ticks, catch/miss &amp; victory. Toggle with the speaker button up top.</li>
       </ol>
     </details>
   </section>
@@ -71,8 +74,11 @@
     <div id="lbPlayers" class="players"></div>
     <div class="row" id="hostControls">
       <div class="grow">
-        <label class="lbl">Total rounds</label>
-        <select id="lbRounds"></select>
+        <label class="lbl">Total rounds (1–500 or ♾️)</label>
+        <div class="rounds-pick">
+          <input id="lbRounds" type="number" min="1" max="500" step="1" value="5" />
+          <label class="endless-check"><input id="lbEndless" type="checkbox" /> ♾️</label>
+        </div>
       </div>
       <div class="grow" style="display:flex;align-items:flex-end;gap:8px">
         <button id="btnAddBot" class="btn">🤖 Add bot</button>
@@ -92,6 +98,15 @@
     </div>
 
     <div id="scorebar" class="scorebar"></div>
+
+    <!-- host mid-game round controls (extend / endless / finish early) -->
+    <div id="midGameControls" class="midgame hidden">
+      <span class="muted">Host: rounds</span>
+      <input id="midRounds" type="number" min="1" max="500" step="1" />
+      <label class="endless-check"><input id="midEndless" type="checkbox" /> ♾️</label>
+      <button id="btnSetRounds" class="btn small">Set</button>
+      <button id="btnEndGame" class="btn small danger">🏁 End game</button>
+    </div>
 
     <!-- chit -->
     <div id="chitZone" class="chit-zone">

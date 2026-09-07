@@ -25,23 +25,108 @@ const ROLE_META = {
 let myId = null, myRoom = null, myRole = null, isHost = false;
 let revealLeft = 0, revealInt = null, peekTimeout = null, guessInt = null, guessLeft = 0;
 let selectedSuspect = null, currentSuspects = [];
+let curTotalRounds = 5, curRound = 0;
 
-// fill rounds selects 1..10
-['inRounds'].forEach(() => {});
-const lbRounds = $('lbRounds');
-for (let i = 1; i <= 10; i++) {
-  const o = document.createElement('option');
-  o.value = i; o.textContent = i + (i === 1 ? ' round' : ' rounds');
-  if (i === 5) o.selected = true;
-  lbRounds.appendChild(o);
+// ---------------- Sound alerts (Web Audio, no files needed) ----------------
+const Sound = {
+  ctx: null,
+  enabled: localStorage.getItem('rmcs_sound') !== 'off',
+  ensure() {
+    if (!this.enabled) return null;
+    try {
+      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return this.ctx;
+    } catch { return null; }
+  },
+  tone(freq, t0, dur, type = 'sine', vol = 0.18, slideTo = null) {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, ctx.currentTime + t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ctx.currentTime + t0 + dur);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime + t0);
+    g.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t0 + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + dur + 0.05);
+  },
+  play(name) {
+    if (!this.enabled) return;
+    switch (name) {
+      case 'click': this.tone(600, 0, 0.08, 'square', 0.06); break;
+      case 'join': this.tone(520, 0, 0.12, 'sine', 0.15); this.tone(780, 0.1, 0.15, 'sine', 0.15); break;
+      case 'leave': this.tone(400, 0, 0.15, 'sine', 0.12, 250); break;
+      case 'roundStart': [523, 659, 784].forEach((f, i) => this.tone(f, i * 0.12, 0.22, 'triangle', 0.2)); break;
+      case 'chitHide': this.tone(800, 0, 0.15, 'sine', 0.12, 300); break;
+      case 'tick': this.tone(880, 0, 0.07, 'square', 0.07); break;
+      case 'urgent': this.tone(1100, 0, 0.12, 'square', 0.1); break;
+      case 'yourTurn': [784, 988, 1175, 1568].forEach((f, i) => this.tone(f, i * 0.1, 0.18, 'triangle', 0.2)); break;
+      case 'waiting': this.tone(440, 0, 0.2, 'sine', 0.12); this.tone(550, 0.18, 0.25, 'sine', 0.12); break;
+      case 'correct': [523, 659, 784, 1047].forEach((f, i) => this.tone(f, i * 0.11, 0.25, 'triangle', 0.22)); break;
+      case 'wrong': this.tone(220, 0, 0.3, 'sawtooth', 0.15, 110); this.tone(165, 0.25, 0.35, 'sawtooth', 0.12, 90); break;
+      case 'win': [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => this.tone(f, i * 0.14, 0.3, 'triangle', 0.22)); break;
+      case 'chat': this.tone(700, 0, 0.09, 'sine', 0.1); break;
+      case 'next': this.tone(600, 0, 0.1, 'triangle', 0.14, 900); break;
+    }
+  },
+  refreshBtn() {
+    const b = $('btnSound');
+    if (b) { b.textContent = this.enabled ? '🔊' : '🔇'; b.classList.toggle('muted', !this.enabled); }
+  }
+};
+// unlock audio on first user gesture (autoplay policy)
+['click', 'touchstart', 'keydown'].forEach(ev =>
+  window.addEventListener(ev, () => Sound.ensure(), { once: true }));
+Sound.refreshBtn();
+$('btnSound').onclick = () => {
+  Sound.enabled = !Sound.enabled;
+  localStorage.setItem('rmcs_sound', Sound.enabled ? 'on' : 'off');
+  Sound.refreshBtn();
+  Sound.play('click');
+  toast(Sound.enabled ? '🔊 Sound on' : '🔇 Sound off');
+};
+
+// ---------------- Rounds: free choice 1..500 + ♾️ endless (0) ----------------
+const MAX_ROUNDS = 500;
+function fmtRounds(t) { return (!t || t === 0) ? '♾️ endless' : `${t} round${t === 1 ? '' : 's'}`; }
+function fmtRoundLabel(round, total) { return (!total || total === 0) ? `Round ${round} / ♾️` : `Round ${round}/${total}`; }
+function readRounds(numEl, endEl, fallback) {
+  if (endEl && endEl.checked) return 0;
+  let n = parseInt(numEl && numEl.value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  n = Math.round(n);
+  if (n < 1) n = 1;
+  if (n > MAX_ROUNDS) n = MAX_ROUNDS;
+  return n;
 }
+function setRoundsUI(numEl, endEl, total) {
+  const endless = !total || total === 0;
+  if (endEl) endEl.checked = endless;
+  if (numEl) {
+    numEl.disabled = endless;
+    if (!endless) numEl.value = total;
+  }
+}
+const lbRounds = $('lbRounds'), lbEndless = $('lbEndless');
+const inRounds = $('inRounds'), inEndless = $('inEndless');
+const midRounds = $('midRounds'), midEndless = $('midEndless');
+setRoundsUI(lbRounds, lbEndless, 5);
+setRoundsUI(inRounds, inEndless, 5);
+setRoundsUI(midRounds, midEndless, 5);
+[[inRounds, inEndless], [lbRounds, lbEndless], [midRounds, midEndless]].forEach(([n, e]) => {
+  if (e) e.onchange = () => { if (n) n.disabled = e.checked; Sound.play('click'); };
+});
 
 // ---------- home ----------
 $('btnCreate').onclick = () => {
+  Sound.play('click');
   const name = $('inName').value.trim() || 'Player';
-  socket.emit('createRoom', { name, totalRounds: $('inRounds').value });
+  socket.emit('createRoom', { name, totalRounds: readRounds(inRounds, inEndless, 5) });
 };
 $('btnJoin').onclick = () => {
+  Sound.play('click');
   const name = $('inName').value.trim() || 'Player';
   const code = $('inCode').value.trim().toUpperCase();
   if (!code) return toast('Enter a room code first');
@@ -57,7 +142,7 @@ socket.on('publicRooms', (list) => {
   list.forEach(r => {
     const d = document.createElement('div');
     d.className = 'roomitem';
-    d.innerHTML = `<span><b>${r.code}</b> · ${r.humans}👤 + ${r.bots}🤖 · ${r.totalRounds} rounds · host ${escapeHtml(r.host)}</span>`;
+    d.innerHTML = `<span><b>${r.code}</b> · ${r.humans}👤 + ${r.bots}🤖 · ${fmtRounds(r.totalRounds)} · host ${escapeHtml(r.host)}</span>`;
     const b = document.createElement('button');
     b.className = 'btn small'; b.textContent = 'Join';
     b.onclick = () => {
@@ -72,20 +157,35 @@ socket.on('publicRooms', (list) => {
 // ---------- lobby ----------
 socket.on('joined', (d) => {
   myId = d.playerId; myRoom = d.code;
+  curRound = 0; prevPlayerCount = (d.players || []).length;
+  if (d.totalRounds !== undefined) {
+    curTotalRounds = d.totalRounds;
+    setRoundsUI(lbRounds, lbEndless, d.totalRounds);
+    setRoundsUI(midRounds, midEndless, d.totalRounds);
+  }
   $('gCode').textContent = d.code;
   $('chatMsgs').innerHTML = '';
   unread = 0; updateBadge();
   (d.chat || []).forEach(addChatMsg);
   $('chatFab').classList.remove('hidden');
+  Sound.play('join');
   show('screen-lobby');
 });
+let prevPlayerCount = 0;
 socket.on('roomUpdate', (room) => {
   if (room.code !== myRoom) return;
   myRoom = room.code;
   isHost = room.hostId === myId;
   $('lbCode').textContent = room.code;
   $('gCode').textContent = room.code;
-  lbRounds.value = String(room.totalRounds);
+  curTotalRounds = room.totalRounds;
+  setRoundsUI(lbRounds, lbEndless, room.totalRounds);
+  setRoundsUI(midRounds, midEndless, room.totalRounds);
+  if (curRound > 0) $('gRound').textContent = fmtRoundLabel(curRound, curTotalRounds);
+  // join / leave jingle
+  if (prevPlayerCount && room.players.length > prevPlayerCount) Sound.play('join');
+  else if (prevPlayerCount && room.players.length < prevPlayerCount) Sound.play('leave');
+  prevPlayerCount = room.players.length;
 
   const box = $('lbPlayers');
   box.innerHTML = '';
@@ -111,40 +211,78 @@ socket.on('roomUpdate', (room) => {
   $('lbWait').style.display = isHost ? 'none' : 'block';
   $('btnStart').disabled = room.players.length < 2 && false; // allow solo+ bots
   $('btnAddBot').disabled = room.players.length >= 4;
-  if (room.status === 'lobby' && $('screen-lobby').classList.contains('hidden') === false) {
-    // stay in lobby
+  // keep host mid-game bar in sync (visible only to host during active game)
+  if (room.status === 'lobby' || room.status === 'gameover') {
+    $('midGameControls').classList.add('hidden');
+    if (room.status === 'lobby') curRound = 0;
+  } else if ($('screen-game').classList.contains('hidden') === false) {
+    refreshMidGame();
   }
-  // if game started, screen switches via roundStarted
-  if (room.status === 'gameover') { /* handled by gameOver */ }
 });
 
 $('btnCopy').onclick = async () => {
   try { await navigator.clipboard.writeText(myRoom); toast('Room code copied: ' + myRoom); }
   catch { toast('Room code: ' + myRoom); }
 };
-$('btnAddBot').onclick = () => socket.emit('addBot');
-lbRounds.onchange = () => socket.emit('updateSettings', { totalRounds: lbRounds.value });
-$('btnStart').onclick = () => socket.emit('startGame');
+$('btnAddBot').onclick = () => { Sound.play('click'); socket.emit('addBot'); };
+function pushLobbyRounds() {
+  const t = readRounds(lbRounds, lbEndless, curTotalRounds || 5);
+  socket.emit('updateSettings', { totalRounds: t });
+}
+lbRounds.onchange = pushLobbyRounds;
+if (lbEndless) lbEndless.onchange = pushLobbyRounds;
+$('btnStart').onclick = () => { Sound.play('click'); socket.emit('startGame'); };
 $('btnLeave1').onclick = () => { socket.emit('leaveRoom'); location.reload(); };
 $('btnLeave2').onclick = () => { socket.emit('leaveRoom'); location.reload(); };
+
+// host mid-game controls
+function refreshMidGame() {
+  $('midGameControls').classList.toggle('hidden', !isHost);
+}
+$('btnSetRounds').onclick = () => {
+  Sound.play('click');
+  const t = readRounds(midRounds, midEndless, curTotalRounds || 5);
+  socket.emit('updateSettings', { totalRounds: t });
+};
+$('btnEndGame').onclick = () => {
+  Sound.play('click');
+  if (confirm('End the game now and show the winner?')) socket.emit('endGame');
+};
+socket.on('roundsUpdated', ({ totalRounds, currentRound }) => {
+  curTotalRounds = totalRounds;
+  if (currentRound) curRound = currentRound;
+  setRoundsUI(lbRounds, lbEndless, totalRounds);
+  setRoundsUI(midRounds, midEndless, totalRounds);
+  if (curRound > 0) $('gRound').textContent = fmtRoundLabel(curRound, curTotalRounds);
+  toast(`⚙️ Rounds set to ${fmtRounds(totalRounds)}`);
+  Sound.play('next');
+});
 
 // ---------- rounds ----------
 socket.on('roundAnnounce', ({ round, totalRounds }) => {
   show('screen-game');
+  curRound = round; curTotalRounds = totalRounds;
+  setRoundsUI(midRounds, midEndless, totalRounds);
+  refreshMidGame();
+  Sound.play('roundStart');
   $('overZone').classList.add('hidden');
   $('resultZone').classList.add('hidden');
   $('guessZone').classList.add('hidden');
   $('chitZone').classList.remove('hidden');
-  $('gRound').textContent = `Round ${round}/${totalRounds}`;
+  $('gRound').textContent = fmtRoundLabel(round, totalRounds);
 });
 
 socket.on('roundStarted', (d) => {
   show('screen-game');
+  curRound = d.round; curTotalRounds = d.totalRounds;
+  setRoundsUI(midRounds, midEndless, d.totalRounds);
+  refreshMidGame();
+  Sound.play('roundStart');
   $('overZone').classList.add('hidden');
   $('resultZone').classList.add('hidden');
   $('guessZone').classList.add('hidden');
   $('chitZone').classList.remove('hidden');
-  $('gRound').textContent = `Round ${d.round}/${d.totalRounds}`;
+  $('gRound').textContent = fmtRoundLabel(d.round, d.totalRounds);
   myRole = d.myRole;
   renderScores(d.players);
   showChit(myRole, d.revealSeconds);
@@ -179,6 +317,7 @@ function showChit(role, secs) {
   revealInt = setInterval(() => {
     revealLeft--;
     $('chitTimer').textContent = Math.max(0, revealLeft);
+    if (revealLeft <= 3 && revealLeft > 0) Sound.play('tick');
     if (revealLeft <= 0) { clearInterval(revealInt); hideChit(); }
   }, 1000);
 }
@@ -191,10 +330,14 @@ function hideChit(auto = true) {
   $('chitPts').textContent = myRole ? `You are: ${ROLE_META[myRole].emoji} ${ROLE_META[myRole].name}` : '';
   $('chitTimer').textContent = '🔒';
   $('chitMsg').textContent = 'Chit hidden — no sneaking! Use Peek for a quick glance.';
-  if (auto) $('btnPeek').style.display = 'inline-block';
+  if (auto) {
+    $('btnPeek').style.display = 'inline-block';
+    Sound.play('chitHide');
+  }
 }
 
 $('btnPeek').onclick = () => {
+  Sound.play('click');
   // reveal for 2s only
   const meta = ROLE_META[myRole];
   const card = $('chitCard');
@@ -217,6 +360,7 @@ socket.on('guessPhase', (d) => {
   selectedSuspect = null;
 
   const iAm = d.sipahiId === myId;
+  Sound.play(iAm ? 'yourTurn' : 'waiting');
   $('guessTitle').textContent = iAm
     ? '🕵️ You are the SIPAHI — catch the CHOR!'
     : `🕵️ ${d.sipahiName} (Sipahi) is choosing…`;
@@ -232,6 +376,7 @@ socket.on('guessPhase', (d) => {
     div.innerHTML = `<span>🕵️ ${escapeHtml(s.name)} ${s.isBot ? '🤖' : ''}</span><span>${iAm ? '👉' : '…'}</span>`;
     if (iAm) {
       div.onclick = () => {
+        Sound.play('click');
         selectedSuspect = s.id;
         [...box.children].forEach(c => c.classList.remove('sel'));
         div.classList.add('sel');
@@ -254,6 +399,7 @@ socket.on('guessPhase', (d) => {
     gz.appendChild(btn);
     btn.onclick = () => {
       if (!selectedSuspect) return toast('Pick a suspect first!');
+      Sound.play('click');
       socket.emit('makeGuess', { suspectId: selectedSuspect });
       btn.disabled = true;
     };
@@ -261,13 +407,14 @@ socket.on('guessPhase', (d) => {
   btn.style.display = iAm ? 'block' : 'none';
   btn.disabled = true;
 
-  // countdown display
+  // countdown display + warning ticks in last 5s to alert players
   clearInterval(guessInt);
   guessLeft = d.guessSeconds;
   $('guessTimer').textContent = guessLeft;
   guessInt = setInterval(() => {
     guessLeft--;
     $('guessTimer').textContent = Math.max(0, guessLeft);
+    if (guessLeft <= 5 && guessLeft > 0) Sound.play(guessLeft <= 2 ? 'urgent' : 'tick');
     if (guessLeft <= 0) clearInterval(guessInt);
   }, 1000);
 });
@@ -275,6 +422,7 @@ socket.on('guessPhase', (d) => {
 // ---------- result ----------
 socket.on('roundResult', (d) => {
   clearInterval(guessInt);
+  Sound.play(d.correct ? 'correct' : 'wrong');
   $('guessZone').classList.add('hidden');
   const rz = $('resultZone');
   rz.classList.remove('hidden');
@@ -320,9 +468,12 @@ socket.on('roundResult', (d) => {
   }
 });
 
-$('btnNext').onclick = () => socket.emit('nextRound');
+$('btnNext').onclick = () => { Sound.play('next'); socket.emit('nextRound'); };
 
 socket.on('gameOver', (d) => {
+  clearInterval(guessInt); clearInterval(revealInt);
+  Sound.play('win');
+  $('midGameControls').classList.add('hidden');
   $('resultZone').classList.add('hidden');
   $('guessZone').classList.add('hidden');
   $('overZone').classList.remove('hidden');
@@ -343,6 +494,8 @@ socket.on('gameOver', (d) => {
 });
 
 $('btnAgain').onclick = () => {
+  Sound.play('click');
+  curRound = 0;
   socket.emit('restartGame');
   show('screen-lobby');
 };
@@ -374,6 +527,7 @@ function addChatMsg(m) {
 socket.on('chatMsg', (m) => {
   addChatMsg(m);
   if (!chatOpen) { unread++; updateBadge(); }
+  if (!m.sys && m.playerId !== myId) Sound.play('chat');
 });
 function setChat(open) {
   chatOpen = open;

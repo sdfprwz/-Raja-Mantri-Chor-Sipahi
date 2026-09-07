@@ -71,6 +71,16 @@ input:focus,select:focus{border-color:var(--gold)}
 #guessTimerWrap{background:#00000040;display:inline-block;padding:6px 14px;border-radius:999px;font-weight:800;color:var(--gold)}
 .profile{color:var(--gold);text-decoration:none;font-weight:800;font-size:13px;background:#f5c5421a;border:1px solid #f5c54255;padding:4px 12px;border-radius:999px;margin-right:8px;white-space:nowrap}
 .profile:hover{background:#f5c54233}
+.sound-btn{background:#3a3168;border:1px solid #f5c54255;padding:4px 10px;margin-right:8px}
+.sound-btn.muted{opacity:.55}
+.rounds-pick{display:flex;gap:10px;align-items:center}
+.rounds-pick input[type=number]{flex:1}
+.rounds-pick input[type=number]:disabled{opacity:.4}
+.endless-check{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted);white-space:nowrap;cursor:pointer}
+.endless-check input{width:auto;accent-color:var(--gold)}
+.midgame{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#00000035;border:1px dashed #f5c54266;border-radius:12px;padding:8px 10px;margin-bottom:10px;font-size:13px}
+.midgame input[type=number]{width:90px;padding:8px}
+.midgame .endless-check{font-size:13px}
 .foot a{color:var(--gold)}
 /* chat */
 .chat-fab{position:fixed;right:16px;bottom:16px;width:56px;height:56px;border-radius:50%;border:2px solid var(--gold);background:linear-gradient(135deg,var(--gold),#ff9d2e);font-size:24px;cursor:pointer;z-index:50;box-shadow:0 8px 24px #000a}

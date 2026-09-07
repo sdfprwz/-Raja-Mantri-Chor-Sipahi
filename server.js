@@ -26,6 +26,30 @@ const GUESS_SECONDS = 30;
 const CHAT_MAXLEN = 300;
 const CHAT_HISTORY = 50;
 const BOT_NAMES = ['Chintu 🤖', 'Bunty 🤖', 'Guddu 🤖', 'Pinki 🤖', 'Monty 🤖'];
+// No hard round cap anymore — host picks any 1..MAX_ROUNDS, or 0 = ♾️ endless.
+const MIN_ROUNDS = 1;
+const MAX_ROUNDS = 500;
+
+// totalRounds: positive int = fixed length, 0 = endless (host ends manually)
+function parseTotalRounds(v, fallback = 5) {
+  if (v === 0 || v === '0') return 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (['endless', 'inf', 'infinity', '∞', 'unlimited'].includes(s)) return 0;
+  }
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return fallback;
+  if (n <= 0) return 0; // treat 0/negative as endless request via UI checkbox; plain negatives fall back
+  return Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, n));
+}
+
+function formatRounds(totalRounds) {
+  return totalRounds === 0 ? '♾️ endless' : `${totalRounds} round${totalRounds === 1 ? '' : 's'}`;
+}
+
+function isLastRound(room) {
+  return room.totalRounds > 0 && room.currentRound >= room.totalRounds;
+}
 
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -238,7 +262,7 @@ function resolveGuess(room, sipahiId, suspectId, auto = false) {
   io.to(room.code).emit('roundResult', {
     ...room.result,
     players: publicPlayers(room),
-    isLastRound: room.currentRound >= room.totalRounds
+    isLastRound: isLastRound(room)
   });
   broadcastLobby(room);
 }
@@ -269,7 +293,7 @@ io.on('connection', (socket) => {
 
   socket.on('createRoom', ({ name, totalRounds }) => {
     name = String(name || '').trim().slice(0, 15) || 'Player';
-    totalRounds = Math.min(10, Math.max(1, parseInt(totalRounds) || 5));
+    totalRounds = parseTotalRounds(totalRounds, 5);
     const code = genCode();
     const playerId = 'p_' + Math.random().toString(36).slice(2, 9);
     const room = {
@@ -323,9 +347,21 @@ io.on('connection', (socket) => {
 
   socket.on('updateSettings', ({ totalRounds }) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!room || room.status !== 'lobby') return;
+    if (!room) return;
     if (socket.data.playerId !== room.hostId) return;
-    room.totalRounds = Math.min(10, Math.max(1, parseInt(totalRounds) || 5));
+    // Host can set/change rounds in lobby AND mid-game (to extend/shorten/endless).
+    // In lobby any value allowed; mid-game only allow increasing or switching to
+    // endless / a value still ahead of currentRound to avoid retroactive game-over.
+    if (room.status === 'gameover') return;
+    const next = parseTotalRounds(totalRounds, room.totalRounds);
+    if (room.status !== 'lobby') {
+      if (next !== 0 && next < Math.max(room.currentRound, 1)) {
+        return socket.emit('errorMsg', `Can't drop to ${next} — already on round ${room.currentRound}.`);
+      }
+    }
+    room.totalRounds = next;
+    sysMsg(room, `⚙️ Host set rounds to ${formatRounds(next)}`);
+    io.to(room.code).emit('roundsUpdated', { totalRounds: next, currentRound: room.currentRound });
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -369,7 +405,9 @@ io.on('connection', (socket) => {
     room.currentRound = 0;
     room.lastRoles = null;
     broadcastPublicRooms();
-    sysMsg(room, `🎮 Game started — ${room.totalRounds} round(s). Good luck!`);
+    sysMsg(room, room.totalRounds === 0
+      ? `🎮 Game started — ♾️ endless mode! Host ends it with 🏁 End game. Good luck!`
+      : `🎮 Game started — ${room.totalRounds} round(s). Good luck!`);
     startRound(room);
   });
 
@@ -382,23 +420,38 @@ io.on('connection', (socket) => {
     resolveGuess(room, sipahi.id, suspectId, false);
   });
 
+  function finishGame(room) {
+    room.status = 'gameover';
+    const sorted = [...room.players].sort((a, b) => b.score - a.score);
+    io.to(room.code).emit('gameOver', {
+      players: publicPlayers(room),
+      winner: { id: sorted[0].id, name: sorted[0].name, score: sorted[0].score, isBot: sorted[0].isBot }
+    });
+    sysMsg(room, `🏆 ${sorted[0].name} wins with ${sorted[0].score} pts after ${room.currentRound} round(s)! GG everyone 🎉`);
+    broadcastLobby(room);
+    broadcastPublicRooms();
+  }
+
   socket.on('nextRound', () => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.status !== 'result') return;
     if (socket.data.playerId !== room.hostId) return;
-    if (room.currentRound >= room.totalRounds) {
-      room.status = 'gameover';
-      const sorted = [...room.players].sort((a, b) => b.score - a.score);
-      io.to(room.code).emit('gameOver', {
-        players: publicPlayers(room),
-        winner: { id: sorted[0].id, name: sorted[0].name, score: sorted[0].score, isBot: sorted[0].isBot }
-      });
-      sysMsg(room, `🏆 ${sorted[0].name} wins with ${sorted[0].score} pts! GG everyone 🎉`);
-      broadcastLobby(room);
-      broadcastPublicRooms();
+    if (isLastRound(room)) {
+      finishGame(room);
     } else {
       startRound(room);
     }
+  });
+
+  // Host can end the game at any point mid-game (needed for ♾️ endless mode,
+  // but also works as an early-finish for fixed-length games).
+  socket.on('endGame', () => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room) return;
+    if (socket.data.playerId !== room.hostId) return socket.emit('errorMsg', 'Only host can end the game.');
+    if (room.status === 'lobby' || room.status === 'gameover') return;
+    clearTimers(room);
+    finishGame(room);
   });
 
   socket.on('restartGame', () => {
