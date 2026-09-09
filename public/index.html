@@ -23,95 +23,94 @@
 
 <main class="wrap">
 
-  <!-- HOME / LANDING -->
+  <!-- HOME / LANDING SLIDER -->
   <section id="screen-home" class="card landing">
-    <div class="hero">
-      <div class="hero-glow"></div>
-      <div class="hero-top">
-        <span class="pill live"><i></i>LIVE MULTIPLAYER</span>
-        <span class="pill">🤖 Bots included</span>
-        <span class="pill">📷 QR Join</span>
-        <span class="pill">🔊 Sound alerts</span>
-      </div>
-      <h1 class="hero-title">👑 Raja <span class="grad">Mantri</span><br />Chor Sipahi</h1>
-      <p class="hero-sub">The classic Indian chit game — reborn online.<br />Deal the chits, hide your role, and let the <b>Sipahi hunt the Chor</b>! 🕵️🥷</p>
-      <div class="hero-art" id="heroArt">
-        <img src="assets/hero-group.jpg" alt="Raja Mantari Chor Sipahi — all four characters" loading="eager" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('missing');this.remove()" />
-        <a href="#play" class="hero-play" data-scroll="#play">▶ Play Now</a>
-      </div>
-      <div id="inviteBanner" class="invite-banner hidden"></div>
-      <div class="hero-chits" id="heroChits">
-        <div class="mini-chit r-raja" style="--d:0s"><img class="mc-img" src="assets/raja.jpg" alt="Raja" loading="lazy" onerror="this.remove()" /><div class="mc-emoji">👑</div><div class="mc-name">RAJA</div><div class="mc-pts">1000 pts</div><div class="mc-tag">Lead 👑</div></div>
-        <div class="mini-chit r-mantri" style="--d:.6s"><img class="mc-img" src="assets/mantari.jpg" alt="Mantari" loading="lazy" onerror="this.remove()" /><div class="mc-emoji">🎩</div><div class="mc-name">MANTRI</div><div class="mc-pts">800 pts</div><div class="mc-tag">Plan 🎩</div></div>
-        <div class="mini-chit r-sipahi" style="--d:1.2s"><img class="mc-img" src="assets/sipahi.jpg" alt="Sipahi" loading="lazy" onerror="this.remove()" /><div class="mc-emoji">🕵️</div><div class="mc-name">SIPAHI</div><div class="mc-pts">500 / 0</div><div class="mc-tag">Catch 🔍</div></div>
-        <div class="mini-chit r-chor" style="--d:1.8s"><img class="mc-img" src="assets/chor.jpg" alt="Chor" loading="lazy" onerror="this.remove()" /><div class="mc-emoji">🥷</div><div class="mc-name">CHOR</div><div class="mc-pts">0 / 500</div><div class="mc-tag">Outsmart 🤫</div></div>
-      </div>
-      <div class="hero-cta-row">
-        <a href="#play" class="btn primary big" id="btnPlayNow">✨ Play now</a>
-        <a href="#how" class="btn ghost">📜 How to play</a>
-      </div>
-      <div class="hero-stats">
-        <div><b>4</b><span>players / room</span></div>
-        <div><b>7s</b><span>chit reveal 👀</span></div>
-        <div><b>30s</b><span>Sipahi guess ⏱</span></div>
-        <div><b>∞</b><span>endless mode ♾️</span></div>
-      </div>
-    </div>
+    <div id="inviteBanner" class="invite-banner hidden"></div>
+    <div class="slider" id="homeSlider">
+      <div class="slides" id="homeSlides">
 
-    <div id="play" class="play-panel">
-    <div class="play-head"><h2>🎮 Start playing</h2><p class="muted">Create a room & share the QR — or join with a code.</p></div>
-    <div class="rules-mini">
-      <span>👑 Raja <b>1000</b></span><span>🎩 Mantri <b>800</b></span><span>🕵️ Sipahi <b>500 / 0</b></span><span>🥷 Chor <b>0 / 500</b></span>
-    </div>
-    <label class="lbl">Your name</label>
-    <input id="inName" maxlength="15" placeholder="e.g. Arjun" />
-    <div class="row">
-      <div class="grow">
-        <label class="lbl">Rounds (1–500, or ♾️ endless)</label>
-        <div class="rounds-pick">
-          <input id="inRounds" type="number" min="1" max="500" step="1" value="5" />
-          <label class="endless-check"><input id="inEndless" type="checkbox" /> ♾️ Endless</label>
+        <div class="slide slide-hero">
+          <div class="slide-art full-bleed">
+            <img src="assets/hero-group.jpg" alt="Raja Mantari Chor Sipahi — all four characters" loading="eager" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('missing');this.remove()" />
+          </div>
+          <div class="slide-cap">
+            <div class="hero-top">
+              <span class="pill live"><i></i>LIVE MULTIPLAYER</span>
+              <span class="pill">Bots included</span>
+              <span class="pill">QR Join</span>
+            </div>
+            <h1 class="hero-title">Raja <span class="grad">Mantri</span><br />Chor Sipahi</h1>
+            <p class="hero-sub">Same classic game. New friends everywhere.<br />Strategy · Bluff · Fun · Together</p>
+          </div>
         </div>
+
+        <div class="slide slide-char">
+          <div class="slide-art"><img src="assets/raja.jpg" alt="Raja — The King" loading="lazy" onerror="this.closest('.slide').classList.add('missing')" /></div>
+          <div class="char-box"><b>RAJA — Lead</b><span>1000 pts · Calm mind. Bold moves.</span></div>
+        </div>
+
+        <div class="slide slide-char">
+          <div class="slide-art"><img src="assets/mantari.jpg" alt="Mantari — The Strategist" loading="lazy" onerror="this.closest('.slide').classList.add('missing')" /></div>
+          <div class="char-box"><b>MANTARI — Plan</b><span>800 pts · Plans today, wins tomorrow.</span></div>
+        </div>
+
+        <div class="slide slide-char">
+          <div class="slide-art"><img src="assets/chor.jpg" alt="Chor — The Outsmart" loading="lazy" onerror="this.closest('.slide').classList.add('missing')" /></div>
+          <div class="char-box"><b>CHOR — Outsmart</b><span>0 / 500 pts · Steals opportunities, not just gold.</span></div>
+        </div>
+
+        <div class="slide slide-char">
+          <div class="slide-art"><img src="assets/sipahi.jpg" alt="Sipahi — The Catcher" loading="lazy" onerror="this.closest('.slide').classList.add('missing')" /></div>
+          <div class="char-box"><b>SIPAHI — Catch</b><span>500 / 0 pts · Alert eyes. Steady mind.</span></div>
+        </div>
+
+        <div class="slide slide-play">
+          <div id="play" class="play-panel">
+            <div class="play-head"><h2>Start playing</h2><p class="muted">Create a room and share the QR — or join with a code.</p></div>
+            <div class="rules-mini">
+              <span>Raja <b>1000</b></span><span>Mantri <b>800</b></span><span>Sipahi <b>500 / 0</b></span><span>Chor <b>0 / 500</b></span>
+            </div>
+            <label class="lbl">Your name</label>
+            <input id="inName" maxlength="15" placeholder="e.g. Arjun" />
+            <div class="row">
+              <div class="grow">
+                <label class="lbl">Rounds (1–500, or endless)</label>
+                <div class="rounds-pick">
+                  <input id="inRounds" type="number" min="1" max="500" step="1" value="5" />
+                  <label class="endless-check"><input id="inEndless" type="checkbox" /> Endless</label>
+                </div>
+              </div>
+              <div class="grow">
+                <label class="lbl">Room code (to join)</label>
+                <input id="inCode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase" />
+              </div>
+            </div>
+            <div class="row">
+              <button id="btnCreate" class="btn primary">Create Room</button>
+              <button id="btnJoin" class="btn">Join Room</button>
+            </div>
+            <h3>Open rooms <button id="btnRefresh" class="btn small">↻</button></h3>
+            <div id="roomList" class="roomlist"><div class="muted">No open rooms — create one!</div></div>
+            <details class="how" id="how">
+              <summary>How to play</summary>
+              <ol>
+                <li>4 chits — <b>Raja, Mantri, Chor, Sipahi</b> — are dealt secretly each round.</li>
+                <li>Your chit shows for <b>7 seconds</b> then hides. Use <b>Peek</b> to glance again briefly.</li>
+                <li><b>Sipahi</b> must catch the <b>Chor</b> by picking a suspect.</li>
+                <li>Correct guess → Sipahi <b>500</b>, Chor <b>0</b>. Wrong guess → swapped! Raja <b>1000</b>, Mantri <b>800</b> fixed.</li>
+                <li>Most points after all rounds wins. Short of 4 friends? Add bots.</li>
+                <li>Host picks <b>any 1–500 rounds, or endless</b> — and can extend/shorten mid-game.</li>
+              </ol>
+            </details>
+          </div>
+        </div>
+
       </div>
-      <div class="grow">
-        <label class="lbl">Room code (to join)</label>
-        <input id="inCode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase" />
-      </div>
+      <button class="slide-btn prev" id="slidePrev" aria-label="Previous">‹</button>
+      <button class="slide-btn next" id="slideNext" aria-label="Next">›</button>
+      <div class="slide-dots" id="slideDots"></div>
+      <div class="slide-count" id="slideCount">1 / 6</div>
     </div>
-    <div class="row">
-      <button id="btnCreate" class="btn primary">✨ Create Room</button>
-      <button id="btnJoin" class="btn">🚪 Join Room</button>
-    </div>
-    </div>
-    <h3>🟢 Open rooms <button id="btnRefresh" class="btn small">↻</button></h3>
-    <div id="roomList" class="roomlist"><div class="muted">No open rooms — create one!</div></div>
-    <div class="features">
-      <div class="feat"><div class="fe">📷</div><b>QR instant join</b><span>Host shows QR, friends scan & join — no code typing.</span></div>
-      <div class="feat"><div class="fe">🎲</div><b>Fair crypto deal</b><span>Shuffled with crypto randomness, no repeat-role streaks.</span></div>
-      <div class="feat"><div class="fe">🤖</div><b>Bots + live chat</b><span>Short of 4? Add bots. Alerts when anyone joins / leaves.</span></div>
-      <div class="feat"><div class="fe">🔊</div><b>Sounds + endless</b><span>Round, hide, guess & win jingles. 1–500 rounds or ♾️.</span></div>
-    </div>
-    <div class="cast">
-      <h3>🎭 Meet the cast <span class="muted small">— your uploaded art, as-is</span></h3>
-      <div class="cast-grid">
-        <figure class="cast-card reveal"><img src="assets/raja.jpg" alt="Raja character sheet" loading="lazy" onerror="this.closest('.cast-card').classList.add('missing')" /><figcaption><b>👑 Raja — Lead</b><span>1000 pts · wise but playful</span></figcaption></figure>
-        <figure class="cast-card reveal"><img src="assets/mantari.jpg" alt="Mantari character sheet" loading="lazy" onerror="this.closest('.cast-card').classList.add('missing')" /><figcaption><b>🎩 Mantari — Plan</b><span>800 pts · strategist</span></figcaption></figure>
-        <figure class="cast-card reveal"><img src="assets/chor.jpg" alt="Chor character sheet" loading="lazy" onerror="this.closest('.cast-card').classList.add('missing')" /><figcaption><b>🥷 Chor — Outsmart</b><span>0 / 500 · sneaky & smart</span></figcaption></figure>
-        <figure class="cast-card reveal"><img src="assets/sipahi.jpg" alt="Sipahi character sheet" loading="lazy" onerror="this.closest('.cast-card').classList.add('missing')" /><figcaption><b>🕵️ Sipahi — Catch</b><span>500 / 0 · brave but fair</span></figcaption></figure>
-      </div>
-      <p class="muted small cast-note">Drop your 5 JPGs into <code>public/assets/</code> (hero-group, raja, mantari, chor, sipahi) — they appear here automatically with fallback to emoji if missing.</p>
-    </div>
-    <details class="how" id="how">
-      <summary>📜 How to play</summary>
-      <ol>
-        <li>4 chits — <b>Raja, Mantri, Chor, Sipahi</b> — are dealt secretly each round.</li>
-        <li>Your chit shows for <b>7 seconds</b> then hides (anti-sneak 👀). Use <b>Peek</b> to glance again briefly.</li>
-        <li><b>Sipahi</b> must catch the <b>Chor</b> by picking a suspect.</li>
-        <li>Correct guess → Sipahi <b>500</b>, Chor <b>0</b>. Wrong guess → swapped! Raja <b>1000</b>, Mantri <b>800</b> fixed.</li>
-        <li>Most points after all rounds wins 🏆. Short of 4 friends? Add bots 🤖.</li>
-        <li>Host picks <b>any 1–500 rounds, or ♾️ endless</b> — and can extend/shorten mid-game. 🔊 Sounds alert you: round start, chit hide, Sipahi turn, countdown ticks, catch/miss &amp; victory. Toggle with the speaker button up top.</li>
-      </ol>
-    </details>
   </section>
 
   <!-- LOBBY -->

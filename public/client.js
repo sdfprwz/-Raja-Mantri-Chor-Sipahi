@@ -408,7 +408,7 @@ function hideChit(auto = true) {
   if (img) img.classList.add('hidden');
   $('chitEmoji').textContent = '🂠';
   $('chitName').textContent = 'HIDDEN';
-  $('chitPts').textContent = myRole ? `You are: ${ROLE_META[myRole].emoji} ${ROLE_META[myRole].name}` : '';
+  $('chitPts').textContent = myRole ? `You are: ${ROLE_META[myRole].name}` : '';
   $('chitTimer').textContent = '🔒';
   $('chitMsg').textContent = 'Chit hidden — no sneaking! Use Peek for a quick glance.';
   if (auto) {
@@ -527,7 +527,7 @@ socket.on('roundResult', (d) => {
     const div = document.createElement('div');
     div.className = 'rescard';
     const imgHtml = m.img ? `<img class="res-img" src="${m.img}" alt="${m.name}" loading="lazy" onerror="this.remove()" />` : '';
-    div.innerHTML = `${imgHtml}<div class="e">${m.emoji}</div><b>${m.name}</b><br>${escapeHtml(r.name)}${id === myId ? ' (you)' : ''}<br><small>+${r.points} pts</small>`;
+    div.innerHTML = `${imgHtml}<div class="e">${m.emoji}</div><div class="res-info"><b>${m.name}</b><span>${escapeHtml(r.name)}${id === myId ? ' (you)' : ''}</span><small>+${r.points} pts</small></div>`;
     cards.appendChild(div);
   });
 
@@ -639,48 +639,58 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// ---------- landing micro-interactions (tilt + smooth scroll, no deps) ----------
+// ---------- landing slider (group -> chars -> play) + swipe/dots ----------
 (function landingFX() {
-  // smooth anchor scroll for Play now / How to play (incl. hero overlay button)
-  document.querySelectorAll('a[href^="#"],[data-scroll]').forEach(a => {
-    a.addEventListener('click', (e) => {
-      const sel = a.getAttribute('data-scroll') || a.getAttribute('href');
-      if (!sel || !sel.startsWith('#')) return;
-      const el = document.querySelector(sel);
-      if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); Sound.play('click'); }
+  const slider = $('homeSlider'), track = $('homeSlides');
+  if (slider && track) {
+    const slides = [...track.querySelectorAll('.slide')];
+    const prev = $('slidePrev'), next = $('slideNext'), dots = $('slideDots'), count = $('slideCount');
+    let idx = 0;
+    slides.forEach((_, i) => {
+      const d = document.createElement('button');
+      d.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+      d.onclick = () => { go(i); Sound.play('click'); };
+      dots.appendChild(d);
     });
-  });
-  // scroll-reveal for uploaded cast cards (shown as-is, animated in)
-  try {
-    const io = new IntersectionObserver((ents) => {
-      ents.forEach(en => { if (en.isIntersecting) { en.target.classList.add('visible'); io.unobserve(en.target); } });
-    }, { threshold: 0.15 });
-    document.querySelectorAll('.reveal,.cast-card').forEach(el => io.observe(el));
-  } catch {}
-  // subtle parallax on hero art
-  const heroArt = $('heroArt');
-  if (heroArt && window.matchMedia('(pointer:fine)').matches) {
-    const img = heroArt.querySelector('img');
-    heroArt.addEventListener('pointermove', (e) => {
-      const r = heroArt.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width - 0.5;
-      const y = (e.clientY - r.top) / r.height - 0.5;
-      if (img) img.style.translate = `${x * 10}px ${y * 10}px`;
+    function syncHeight() {
+      const active = slides[idx];
+      if (active) slider.style.height = 'auto';
+    }
+    function go(i) {
+      idx = Math.max(0, Math.min(slides.length - 1, i));
+      track.style.transform = `translateX(-${idx * 100}%)`;
+      [...dots.children].forEach((d, j) => d.classList.toggle('on', j === idx));
+      if (count) count.textContent = `${idx + 1} / ${slides.length}`;
+      if (prev) prev.style.visibility = idx === 0 ? 'hidden' : 'visible';
+      if (next) next.innerHTML = idx === slides.length - 1 ? '✓' : '›';
+      syncHeight();
+    }
+    if (prev) prev.onclick = () => { go(idx - 1); Sound.play('click'); };
+    if (next) next.onclick = () => {
+      Sound.play('click');
+      if (idx === slides.length - 1) go(0);
+      else go(idx + 1);
+    };
+    // swipe
+    let sx = null;
+    track.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    track.addEventListener('touchend', (e) => {
+      if (sx === null) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      if (Math.abs(dx) > 40) go(idx + (dx < 0 ? 1 : -1));
+      sx = null;
+    }, { passive: true });
+    // keyboard
+    document.addEventListener('keydown', (e) => {
+      if ($('screen-home').classList.contains('hidden')) return;
+      if (e.key === 'ArrowRight') go(idx + 1);
+      if (e.key === 'ArrowLeft') go(idx - 1);
     });
-    heroArt.addEventListener('pointerleave', () => { if (img) img.style.translate = ''; });
+    // invite deep-link jumps straight to play slide
+    try {
+      if (new URLSearchParams(window.location.search).get('room')) go(slides.length - 1);
+    } catch {}
+    window._goPlaySlide = () => go(slides.length - 1);
+    go(0);
   }
-  // 3D tilt on hero chit cards (desktop pointer only)
-  const wrap = $('heroChits');
-  if (!wrap || !window.matchMedia('(pointer:fine)').matches) return;
-  const cards = [...wrap.querySelectorAll('.mini-chit')];
-  cards.forEach(card => {
-    card.addEventListener('pointermove', (e) => {
-      const r = card.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width - 0.5;
-      const y = (e.clientY - r.top) / r.height - 0.5;
-      card.style.transform = `translateY(-8px) scale(1.05) rotateY(${x * 16}deg) rotateX(${-y * 16}deg)`;
-    });
-    card.addEventListener('pointerleave', () => { card.style.transform = ''; });
-    card.addEventListener('click', () => Sound.play('click'));
-  });
 })();
