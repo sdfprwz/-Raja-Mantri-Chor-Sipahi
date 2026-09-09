@@ -691,6 +691,8 @@ function escapeHtml(s) {
       if (new URLSearchParams(window.location.search).get('room')) go(slides.length - 1);
     } catch {}
     window._goPlaySlide = () => go(slides.length - 1);
+    const startHero = $('btnStartHero');
+    if (startHero) startHero.onclick = () => { Sound.play('roundStart'); go(slides.length - 1); };
     go(0);
   }
 })();

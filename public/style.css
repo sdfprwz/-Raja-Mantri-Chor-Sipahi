@@ -208,10 +208,12 @@ body{overflow-x:hidden}
 .slider{position:relative;overflow:hidden;background:linear-gradient(180deg,#2c2350,#221b3a)}
 .slides{display:flex;transition:transform .45s cubic-bezier(.3,.9,.3,1);align-items:flex-start}
 .slide{min-width:100%;padding:22px;text-align:center}
-.slide-art{border-radius:16px;overflow:hidden;border:2px solid #f5c54244;box-shadow:0 14px 40px #0009;background:#fff}
-.slide-art img{display:block;width:100%;height:auto}
-.slide-art.full-bleed img{aspect-ratio:16/10;object-fit:cover}
-.slide-char .slide-art img{aspect-ratio:4/4.4;object-fit:cover;object-position:top}
+.slide-art{border-radius:20px;overflow:hidden;border:2px solid #f5c54244;box-shadow:0 14px 40px #0009;background:#0e0a24}
+.slide-art img{display:block;width:100%;height:auto;border-radius:18px}
+/* full image always visible — never crop */
+.slide-art.full-bleed img{aspect-ratio:auto;object-fit:contain;background:#0e0a24}
+.slide-char .slide-art{background:#fff}
+.slide-char .slide-art img{aspect-ratio:auto;object-fit:contain;object-position:center;max-height:52vh;background:#fff}
 .slide.missing .slide-art{display:none}
 .slide-cap{margin-top:12px}
 .char-box{margin:12px auto 0;max-width:420px;background:#00000045;border:1px solid #ffffff1c;border-radius:12px;padding:10px 14px}
@@ -227,16 +229,25 @@ body{overflow-x:hidden}
 .slide-dots button.on{background:var(--gold);transform:scale(1.25)}
 .slide-count{text-align:center;font-size:12px;color:var(--muted);padding-bottom:12px}
 /* ---------- clean chit + result: full image, info box below, no emoji when art works ---------- */
-.chit{width:230px;height:auto;min-height:300px;padding:12px}
-.chit-img{width:100%;height:200px;object-fit:contain;background:#fff;border-radius:12px;border:0;margin-bottom:8px}
+.chit{width:230px;height:auto;min-height:300px;padding:12px;border-radius:20px}
+.chit-img{width:100%;height:210px;object-fit:contain;background:#fff;border-radius:14px;border:0;margin-bottom:8px}
 .chit:has(#chitImg:not(.hidden)) #chitEmoji{display:none}
 .chit:has(#chitImg:not(.hidden)){background:linear-gradient(180deg,#fffdf4,#f7e7bd);border-color:#8a6420}
-.chit-name{background:#00000030;border-radius:8px;padding:2px 10px}
-.chit-pts{margin-top:4px}
-.rescard{padding:0;overflow:hidden;display:flex;flex-direction:column}
-.res-img{width:100%;height:170px;object-fit:contain;background:#fff;border:0;border-radius:0;margin:0}
+.chit-name{background:#00000030;border-radius:10px;padding:2px 10px}
+.chit-pts{margin-top:4px;border-radius:10px}
+.rescard{padding:0;overflow:hidden;display:flex;flex-direction:column;border-radius:16px}
+.res-img{width:100%;height:190px;object-fit:contain;background:#fff;border:0;border-radius:14px 14px 0 0;margin:0}
 .rescard:has(.res-img) .e{display:none}
-.res-info{background:#00000050;padding:8px;display:flex;flex-direction:column;gap:2px}
+.res-info{background:#00000050;padding:8px;display:flex;flex-direction:column;gap:2px;border-radius:0 0 14px 14px}
+/* ---------- game start screen polish ---------- */
+.slide-hero .slide-cap{margin-top:14px}
+.start-btn{margin-top:14px;padding:16px 44px;font-size:20px;border-radius:999px;box-shadow:0 10px 34px #f5c54255,0 0 0 5px #f5c54222;animation:startPulse 2s ease-in-out infinite;cursor:pointer}
+@keyframes startPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.slide-hint{margin:10px 0 0;font-size:12px;color:var(--muted)}
+.slider{border-radius:20px}
+.slide-art,.char-box,.play-panel,.sharebox,.player,.roomitem,.score,.suspect,.rescard,.cmsg,.chat-panel,.qrbox{border-radius:16px}
+.slide-art img,.chit-img,.res-img{border-radius:14px}
+.btn,.pill,.code,.chat-fab{border-radius:999px}
 .res-info b{letter-spacing:1px}
 .res-info span{font-size:13px}
 .res-info small{color:var(--gold);font-weight:800}
