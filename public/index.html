@@ -6,6 +6,7 @@
 <title>👑 Raja Mantri Chor Sipahi — Online</title>
 <link rel="stylesheet" href="style.css" />
 <script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="bg-pattern"></div>
@@ -24,6 +25,7 @@
   <section id="screen-home" class="card">
     <h1>👑 Raja Mantri Chor Sipahi</h1>
     <p class="sub">The classic Indian chit game — now online with friends & bots!</p>
+    <div id="inviteBanner" class="invite-banner hidden"></div>
     <div class="rules-mini">
       <span>👑 Raja <b>1000</b></span><span>🎩 Mantri <b>800</b></span><span>🕵️ Sipahi <b>500 / 0</b></span><span>🥷 Chor <b>0 / 500</b></span>
     </div>
@@ -70,7 +72,22 @@
         <button id="btnLeave1" class="btn small danger">Leave</button>
       </div>
     </div>
-    <p class="muted" id="lbHint">Share the code with 3 friends. Host can add bots 🤖 to fill seats.</p>
+    <p class="muted" id="lbHint">Share the QR / link with friends — they scan & join directly. Host can add bots 🤖 to fill seats.</p>
+    <div class="sharebox">
+      <div id="qrBox" class="qrbox" title="Scan to join"></div>
+      <div class="share-info">
+        <label class="lbl">Invite link (scan QR or share)</label>
+        <div class="invite-row">
+          <input id="inviteLink" readonly onclick="this.select()" />
+          <button id="btnCopyLink" class="btn small">🔗 Copy link</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="btnShare" class="btn small">📤 Share</button>
+          <button id="btnRegenQR" class="btn small" title="Regenerate QR">↻ QR</button>
+        </div>
+        <p class="muted small">Scanning opens the game with the code pre-filled — just enter name & Join.</p>
+      </div>
+    </div>
     <div id="lbPlayers" class="players"></div>
     <div class="row" id="hostControls">
       <div class="grow">

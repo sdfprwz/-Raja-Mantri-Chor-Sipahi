@@ -147,6 +147,13 @@ function sysMsg(room, text) {
   pushChat(room, { id: 'm_' + Date.now().toString(36) + randInt(1296).toString(36), sys: true, text, ts: Date.now() });
 }
 
+// Room-wide alert: chat sys message + loud playerEvent (toast + sound on clients).
+// Used for joins / leaves / bot join-remove so nobody misses them even with chat closed.
+function announce(room, type, text) {
+  sysMsg(room, text);
+  io.to(room.code).emit('playerEvent', { type, text, ts: Date.now() });
+}
+
 function clearTimers(room) {
   if (room.revealTimer) { clearTimeout(room.revealTimer); room.revealTimer = null; }
   if (room.guessTimer) { clearTimeout(room.guessTimer); room.guessTimer = null; }
@@ -327,7 +334,7 @@ io.on('connection', (socket) => {
     socket.data.roomCode = roomCode;
     socket.data.playerId = playerId;
     socket.emit('joined', { code: roomCode, playerId, players: publicPlayers(room), hostId: room.hostId, totalRounds: room.totalRounds, chat: room.messages });
-    sysMsg(room, `👋 ${name} joined the room (${room.players.length}/4)`);
+    announce(room, 'join', `👋 ${name} joined the room (${room.players.length}/4)`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -375,7 +382,7 @@ io.on('connection', (socket) => {
     const botName = BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + (100 + randInt(900)) + ' 🤖');
     const botId = 'p_' + Math.random().toString(36).slice(2, 9);
     room.players.push({ id: botId, socketId: null, name: botName, isBot: true, score: 0, connected: true });
-    sysMsg(room, `🤖 ${botName} joined the room`);
+    announce(room, 'botJoin', `🤖 ${botName} joined the room (bot) — ${room.players.length}/4 seats filled`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -386,7 +393,7 @@ io.on('connection', (socket) => {
     if (socket.data.playerId !== room.hostId) return;
     const gone = room.players.find(p => p.id === botId && p.isBot);
     room.players = room.players.filter(p => !(p.id === botId && p.isBot));
-    if (gone) sysMsg(room, `🤖 ${gone.name} was removed`);
+    if (gone) announce(room, 'botRemove', `🤖 ${gone.name} was removed (${room.players.length}/4)`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -494,7 +501,7 @@ io.on('connection', (socket) => {
         clearTimers(room);
         rooms.delete(code);
       } else {
-        sysMsg(room, `👋 ${leaverName} left the room`);
+        announce(room, 'leave', `👋 ${leaverName} left the room (${room.players.length}/4)`);
         broadcastLobby(room);
       }
     } else {
@@ -503,7 +510,7 @@ io.on('connection', (socket) => {
       room.players[idx].connected = false;
       room.players[idx].socketId = null;
       room.players[idx].name += ' (left)';
-      sysMsg(room, `⚠️ ${leaverName} disconnected — bot takes over`);
+      announce(room, 'leave', `⚠️ ${leaverName} left — bot takes over 🤖`);
       if (room.hostId === pid) {
         const nextHuman = room.players.find(p => !p.isBot && p.connected !== false);
         if (nextHuman) room.hostId = nextHuman.id;

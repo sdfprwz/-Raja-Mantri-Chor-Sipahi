@@ -164,6 +164,12 @@ socket.on('joined', (d) => {
     setRoundsUI(midRounds, midEndless, d.totalRounds);
   }
   $('gCode').textContent = d.code;
+  renderInvite(d.code);
+  // clean invite ?room= from URL once joined (keeps address bar tidy)
+  try {
+    const u = new URL(window.location.href);
+    if (u.searchParams.get('room')) { u.searchParams.delete('room'); window.history.replaceState({}, '', u.pathname); }
+  } catch {}
   $('chatMsgs').innerHTML = '';
   unread = 0; updateBadge();
   (d.chat || []).forEach(addChatMsg);
@@ -172,19 +178,79 @@ socket.on('joined', (d) => {
   show('screen-lobby');
 });
 let prevPlayerCount = 0;
+// ---- QR invite: link + scannable code (no manual code sharing needed) ----
+function getInviteLink(code) {
+  return `${window.location.origin}/?room=${encodeURIComponent(code)}`;
+}
+function renderInvite(code) {
+  if (!code) return;
+  const link = getInviteLink(code);
+  const inp = $('inviteLink');
+  if (inp) inp.value = link;
+  const box = $('qrBox');
+  if (!box) return;
+  box.innerHTML = '';
+  try {
+    if (typeof QRCode !== 'undefined') {
+      // eslint-disable-next-line no-new
+      new QRCode(box, { text: link, width: 116, height: 116, correctLevel: QRCode.CorrectLevel.M });
+    } else {
+      throw new Error('no QR lib');
+    }
+  } catch {
+    box.innerHTML = `<div class="qr-fallback">Scan N/A<br>${escapeHtml(code)}</div>`;
+  }
+}
+$('btnCopyLink').onclick = async () => {
+  const link = ($('inviteLink') && $('inviteLink').value) || getInviteLink(myRoom || '');
+  try { await navigator.clipboard.writeText(link); toast('🔗 Invite link copied!'); }
+  catch { $('inviteLink').select(); document.execCommand && document.execCommand('copy'); toast('🔗 Copy this link: ' + link); }
+  Sound.play('click');
+};
+$('btnShare').onclick = async () => {
+  const link = ($('inviteLink') && $('inviteLink').value) || getInviteLink(myRoom || '');
+  const data = { title: 'Join my Raja-Mantri game!', text: `Join room ${myRoom} 👑`, url: link };
+  if (navigator.share) {
+    try { await navigator.share(data); } catch {}
+  } else {
+    try { await navigator.clipboard.writeText(`${data.text} ${link}`); toast('🔗 Invite copied — send it to friends!'); }
+    catch { toast(link); }
+  }
+  Sound.play('click');
+};
+$('btnRegenQR').onclick = () => { Sound.play('click'); renderInvite(myRoom); toast('↻ QR refreshed'); };
+// Deep-link: ?room=ABCD pre-fills join box so scanned players join in 1 tap
+(function handleInviteParam() {
+  try {
+    const code = (new URLSearchParams(window.location.search).get('room') || '').trim().toUpperCase().slice(0, 4);
+    if (!code) return;
+    $('inCode').value = code;
+    const b = $('inviteBanner');
+    b.classList.remove('hidden');
+    b.innerHTML = `🎉 Invited to room <b>${escapeHtml(code)}</b>? Enter your name & hit <b>🚪 Join Room</b>!`;
+    toast(`🎉 Invite for room ${code} — hit Join!`);
+    setTimeout(() => $('inName').focus(), 300);
+  } catch {}
+})();
+socket.on('playerEvent', (e) => {
+  if (!e || !e.text) return;
+  toast(e.text);
+  if (e.type === 'join' || e.type === 'botJoin') Sound.play('join');
+  else if (e.type === 'leave' || e.type === 'botRemove') Sound.play('leave');
+  else Sound.play('chat');
+});
 socket.on('roomUpdate', (room) => {
   if (room.code !== myRoom) return;
   myRoom = room.code;
   isHost = room.hostId === myId;
   $('lbCode').textContent = room.code;
   $('gCode').textContent = room.code;
+  renderInvite(room.code);
   curTotalRounds = room.totalRounds;
   setRoundsUI(lbRounds, lbEndless, room.totalRounds);
   setRoundsUI(midRounds, midEndless, room.totalRounds);
   if (curRound > 0) $('gRound').textContent = fmtRoundLabel(curRound, curTotalRounds);
-  // join / leave jingle
-  if (prevPlayerCount && room.players.length > prevPlayerCount) Sound.play('join');
-  else if (prevPlayerCount && room.players.length < prevPlayerCount) Sound.play('leave');
+  // join/leave sounds come from playerEvent (with toast) — avoid double jingle here
   prevPlayerCount = room.players.length;
 
   const box = $('lbPlayers');

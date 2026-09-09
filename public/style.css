@@ -94,4 +94,15 @@ input:focus,select:focus{border-color:var(--gold)}
 .cname{font-size:11px;color:var(--gold);font-weight:800;margin-bottom:2px}
 .chat-input{display:flex;gap:8px;padding:10px;border-top:1px solid #ffffff14}
 .chat-input input{flex:1;padding:10px}
+/* invite / QR share */
+.sharebox{display:flex;gap:14px;align-items:center;background:#00000035;border:1px dashed #f5c54266;border-radius:14px;padding:12px;margin:10px 0;flex-wrap:wrap}
+.qrbox{width:128px;height:128px;min-width:128px;background:#fff;border-radius:10px;padding:6px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.qrbox img,.qrbox canvas{width:100%!important;height:100%!important}
+.qr-fallback{color:#000;font-size:12px;text-align:center;word-break:break-all}
+.share-info{flex:1;min-width:200px}
+.share-info .lbl{margin:0 0 6px}
+.invite-row{display:flex;gap:8px}
+.invite-row input{flex:1;font-size:13px;padding:9px}
+.muted.small{font-size:12px;margin:6px 0 0}
+.invite-banner{background:#f5c54222;border:1px solid var(--gold);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:14px}
 @media(max-width:480px){.scorebar{grid-template-columns:repeat(2,1fr)}.rescards{grid-template-columns:repeat(2,1fr)}}
