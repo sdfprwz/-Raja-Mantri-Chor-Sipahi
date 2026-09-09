@@ -10,6 +10,8 @@
 </head>
 <body>
 <div class="bg-pattern"></div>
+<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+<div class="floaties" aria-hidden="true"><span>👑</span><span>🎩</span><span>🕵️</span><span>🥷</span><span>🃏</span><span>🏆</span></div>
 <header class="topbar">
   <div class="brand">👑 Raja · Mantri · Chor · Sipahi</div>
   <div class="top-right">
@@ -21,11 +23,39 @@
 
 <main class="wrap">
 
-  <!-- HOME -->
-  <section id="screen-home" class="card">
-    <h1>👑 Raja Mantri Chor Sipahi</h1>
-    <p class="sub">The classic Indian chit game — now online with friends & bots!</p>
-    <div id="inviteBanner" class="invite-banner hidden"></div>
+  <!-- HOME / LANDING -->
+  <section id="screen-home" class="card landing">
+    <div class="hero">
+      <div class="hero-glow"></div>
+      <div class="hero-top">
+        <span class="pill live"><i></i>LIVE MULTIPLAYER</span>
+        <span class="pill">🤖 Bots included</span>
+        <span class="pill">📷 QR Join</span>
+        <span class="pill">🔊 Sound alerts</span>
+      </div>
+      <h1 class="hero-title">👑 Raja <span class="grad">Mantri</span><br />Chor Sipahi</h1>
+      <p class="hero-sub">The classic Indian chit game — reborn online.<br />Deal the chits, hide your role, and let the <b>Sipahi hunt the Chor</b>! 🕵️🥷</p>
+      <div id="inviteBanner" class="invite-banner hidden"></div>
+      <div class="hero-chits" id="heroChits">
+        <div class="mini-chit r-raja" style="--d:0s"><div class="mc-emoji">👑</div><div class="mc-name">RAJA</div><div class="mc-pts">1000 pts</div><div class="mc-tag">King 👑</div></div>
+        <div class="mini-chit r-mantri" style="--d:.6s"><div class="mc-emoji">🎩</div><div class="mc-name">MANTRI</div><div class="mc-pts">800 pts</div><div class="mc-tag">Minister 🎩</div></div>
+        <div class="mini-chit r-sipahi" style="--d:1.2s"><div class="mc-emoji">🕵️</div><div class="mc-name">SIPAHI</div><div class="mc-pts">500 / 0</div><div class="mc-tag">Catch him! 🔍</div></div>
+        <div class="mini-chit r-chor" style="--d:1.8s"><div class="mc-emoji">🥷</div><div class="mc-name">CHOR</div><div class="mc-pts">0 / 500</div><div class="mc-tag">Hide! 🤫</div></div>
+      </div>
+      <div class="hero-cta-row">
+        <a href="#play" class="btn primary big" id="btnPlayNow">✨ Play now</a>
+        <a href="#how" class="btn ghost">📜 How to play</a>
+      </div>
+      <div class="hero-stats">
+        <div><b>4</b><span>players / room</span></div>
+        <div><b>7s</b><span>chit reveal 👀</span></div>
+        <div><b>30s</b><span>Sipahi guess ⏱</span></div>
+        <div><b>∞</b><span>endless mode ♾️</span></div>
+      </div>
+    </div>
+
+    <div id="play" class="play-panel">
+    <div class="play-head"><h2>🎮 Start playing</h2><p class="muted">Create a room & share the QR — or join with a code.</p></div>
     <div class="rules-mini">
       <span>👑 Raja <b>1000</b></span><span>🎩 Mantri <b>800</b></span><span>🕵️ Sipahi <b>500 / 0</b></span><span>🥷 Chor <b>0 / 500</b></span>
     </div>
@@ -48,9 +78,16 @@
       <button id="btnCreate" class="btn primary">✨ Create Room</button>
       <button id="btnJoin" class="btn">🚪 Join Room</button>
     </div>
+    </div>
     <h3>🟢 Open rooms <button id="btnRefresh" class="btn small">↻</button></h3>
     <div id="roomList" class="roomlist"><div class="muted">No open rooms — create one!</div></div>
-    <details class="how">
+    <div class="features">
+      <div class="feat"><div class="fe">📷</div><b>QR instant join</b><span>Host shows QR, friends scan & join — no code typing.</span></div>
+      <div class="feat"><div class="fe">🎲</div><b>Fair crypto deal</b><span>Shuffled with crypto randomness, no repeat-role streaks.</span></div>
+      <div class="feat"><div class="fe">🤖</div><b>Bots + live chat</b><span>Short of 4? Add bots. Alerts when anyone joins / leaves.</span></div>
+      <div class="feat"><div class="fe">🔊</div><b>Sounds + endless</b><span>Round, hide, guess & win jingles. 1–500 rounds or ♾️.</span></div>
+    </div>
+    <details class="how" id="how">
       <summary>📜 How to play</summary>
       <ol>
         <li>4 chits — <b>Raja, Mantri, Chor, Sipahi</b> — are dealt secretly each round.</li>

@@ -619,3 +619,28 @@ socket.on('disconnect', () => { $('connDot').className = 'dot off'; $('connText'
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+// ---------- landing micro-interactions (tilt + smooth scroll, no deps) ----------
+(function landingFX() {
+  // smooth anchor scroll for Play now / How to play
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const el = document.querySelector(a.getAttribute('href'));
+      if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); Sound.play('click'); }
+    });
+  });
+  // 3D tilt on hero chit cards (desktop pointer only)
+  const wrap = $('heroChits');
+  if (!wrap || !window.matchMedia('(pointer:fine)').matches) return;
+  const cards = [...wrap.querySelectorAll('.mini-chit')];
+  cards.forEach(card => {
+    card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      card.style.transform = `translateY(-8px) scale(1.05) rotateY(${x * 16}deg) rotateX(${-y * 16}deg)`;
+    });
+    card.addEventListener('pointerleave', () => { card.style.transform = ''; });
+    card.addEventListener('click', () => Sound.play('click'));
+  });
+})();
