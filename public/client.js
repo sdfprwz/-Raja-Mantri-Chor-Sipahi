@@ -16,11 +16,21 @@ function toast(msg) {
 }
 
 const ROLE_META = {
-  raja:   { emoji: '👑', name: 'RAJA',   pts: '1000 pts (fixed)' },
-  mantri: { emoji: '🎩', name: 'MANTRI', pts: '800 pts (fixed)' },
-  chor:   { emoji: '🥷', name: 'CHOR',   pts: '500 if hidden · 0 if caught' },
-  sipahi: { emoji: '🕵️', name: 'SIPAHI', pts: '500 if catch · 0 if wrong' },
+  raja:   { emoji: '👑', name: 'RAJA',   pts: '1000 pts (fixed)', img: 'assets/raja.jpg' },
+  mantri: { emoji: '🎩', name: 'MANTRI', pts: '800 pts (fixed)', img: 'assets/mantari.jpg' },
+  chor:   { emoji: '🥷', name: 'CHOR',   pts: '500 if hidden · 0 if caught', img: 'assets/chor.jpg' },
+  sipahi: { emoji: '🕵️', name: 'SIPAHI', pts: '500 if catch · 0 if wrong', img: 'assets/sipahi.jpg' },
 };
+function setChitImg(role) {
+  const img = document.getElementById('chitImg');
+  if (!img) return;
+  const src = (ROLE_META[role] || {}).img;
+  if (!src) { img.classList.add('hidden'); img.removeAttribute('src'); return; }
+  img.onerror = () => img.classList.add('hidden');
+  img.onload = () => img.classList.remove('hidden');
+  img.src = src;
+  img.alt = role;
+}
 
 let myId = null, myRoom = null, myRole = null, isHost = false;
 let revealLeft = 0, revealInt = null, peekTimeout = null, guessInt = null, guessLeft = 0;
@@ -369,9 +379,12 @@ function showChit(role, secs) {
   const meta = ROLE_META[role];
   const card = $('chitCard');
   card.classList.remove('hidden-chit');
+  card.classList.add('chit-reveal');
+  setTimeout(() => card.classList.remove('chit-reveal'), 600);
   $('chitEmoji').textContent = meta.emoji;
   $('chitName').textContent = meta.name;
   $('chitPts').textContent = meta.pts;
+  setChitImg(role);
   $('chitMsg').textContent = role === 'sipahi'
     ? 'You are SIPAHI! Memorise it — you must catch the CHOR next! 🕵️'
     : 'Memorise your chit — it hides soon! 👀 Don\'t let others peek!';
@@ -391,6 +404,8 @@ function showChit(role, secs) {
 function hideChit(auto = true) {
   const card = $('chitCard');
   card.classList.add('hidden-chit');
+  const img = $('chitImg');
+  if (img) img.classList.add('hidden');
   $('chitEmoji').textContent = '🂠';
   $('chitName').textContent = 'HIDDEN';
   $('chitPts').textContent = myRole ? `You are: ${ROLE_META[myRole].emoji} ${ROLE_META[myRole].name}` : '';
@@ -408,9 +423,12 @@ $('btnPeek').onclick = () => {
   const meta = ROLE_META[myRole];
   const card = $('chitCard');
   card.classList.remove('hidden-chit');
+  card.classList.add('chit-reveal');
+  setTimeout(() => card.classList.remove('chit-reveal'), 600);
   $('chitEmoji').textContent = meta.emoji;
   $('chitName').textContent = meta.name;
   $('chitPts').textContent = meta.pts;
+  setChitImg(myRole);
   $('btnPeek').disabled = true;
   clearTimeout(peekTimeout);
   peekTimeout = setTimeout(() => { hideChit(false); $('btnPeek').disabled = false; }, 2000);
@@ -508,7 +526,8 @@ socket.on('roundResult', (d) => {
     const m = ROLE_META[r.role];
     const div = document.createElement('div');
     div.className = 'rescard';
-    div.innerHTML = `<div class="e">${m.emoji}</div><b>${m.name}</b><br>${escapeHtml(r.name)}${id === myId ? ' (you)' : ''}<br><small>+${r.points} pts</small>`;
+    const imgHtml = m.img ? `<img class="res-img" src="${m.img}" alt="${m.name}" loading="lazy" onerror="this.remove()" />` : '';
+    div.innerHTML = `${imgHtml}<div class="e">${m.emoji}</div><b>${m.name}</b><br>${escapeHtml(r.name)}${id === myId ? ' (you)' : ''}<br><small>+${r.points} pts</small>`;
     cards.appendChild(div);
   });
 
@@ -622,13 +641,34 @@ function escapeHtml(s) {
 
 // ---------- landing micro-interactions (tilt + smooth scroll, no deps) ----------
 (function landingFX() {
-  // smooth anchor scroll for Play now / How to play
-  document.querySelectorAll('a[href^="#"]').forEach(a => {
+  // smooth anchor scroll for Play now / How to play (incl. hero overlay button)
+  document.querySelectorAll('a[href^="#"],[data-scroll]').forEach(a => {
     a.addEventListener('click', (e) => {
-      const el = document.querySelector(a.getAttribute('href'));
+      const sel = a.getAttribute('data-scroll') || a.getAttribute('href');
+      if (!sel || !sel.startsWith('#')) return;
+      const el = document.querySelector(sel);
       if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); Sound.play('click'); }
     });
   });
+  // scroll-reveal for uploaded cast cards (shown as-is, animated in)
+  try {
+    const io = new IntersectionObserver((ents) => {
+      ents.forEach(en => { if (en.isIntersecting) { en.target.classList.add('visible'); io.unobserve(en.target); } });
+    }, { threshold: 0.15 });
+    document.querySelectorAll('.reveal,.cast-card').forEach(el => io.observe(el));
+  } catch {}
+  // subtle parallax on hero art
+  const heroArt = $('heroArt');
+  if (heroArt && window.matchMedia('(pointer:fine)').matches) {
+    const img = heroArt.querySelector('img');
+    heroArt.addEventListener('pointermove', (e) => {
+      const r = heroArt.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      if (img) img.style.translate = `${x * 10}px ${y * 10}px`;
+    });
+    heroArt.addEventListener('pointerleave', () => { if (img) img.style.translate = ''; });
+  }
   // 3D tilt on hero chit cards (desktop pointer only)
   const wrap = $('heroChits');
   if (!wrap || !window.matchMedia('(pointer:fine)').matches) return;

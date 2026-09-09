@@ -12,7 +12,9 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (req, res) => res.json({ ok: true }));
-// SPA fallback for any non-socket route
+// Missing game art should 404 (so <img onerror> fallback works) — not serve index.html
+app.get('/assets/*', (req, res) => res.status(404).send('not found'));
+// SPA fallback for any non-socket route (deep-link ?room= support)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

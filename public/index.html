@@ -35,12 +35,16 @@
       </div>
       <h1 class="hero-title">👑 Raja <span class="grad">Mantri</span><br />Chor Sipahi</h1>
       <p class="hero-sub">The classic Indian chit game — reborn online.<br />Deal the chits, hide your role, and let the <b>Sipahi hunt the Chor</b>! 🕵️🥷</p>
+      <div class="hero-art" id="heroArt">
+        <img src="assets/hero-group.jpg" alt="Raja Mantari Chor Sipahi — all four characters" loading="eager" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('missing');this.remove()" />
+        <a href="#play" class="hero-play" data-scroll="#play">▶ Play Now</a>
+      </div>
       <div id="inviteBanner" class="invite-banner hidden"></div>
       <div class="hero-chits" id="heroChits">
-        <div class="mini-chit r-raja" style="--d:0s"><div class="mc-emoji">👑</div><div class="mc-name">RAJA</div><div class="mc-pts">1000 pts</div><div class="mc-tag">King 👑</div></div>
-        <div class="mini-chit r-mantri" style="--d:.6s"><div class="mc-emoji">🎩</div><div class="mc-name">MANTRI</div><div class="mc-pts">800 pts</div><div class="mc-tag">Minister 🎩</div></div>
-        <div class="mini-chit r-sipahi" style="--d:1.2s"><div class="mc-emoji">🕵️</div><div class="mc-name">SIPAHI</div><div class="mc-pts">500 / 0</div><div class="mc-tag">Catch him! 🔍</div></div>
-        <div class="mini-chit r-chor" style="--d:1.8s"><div class="mc-emoji">🥷</div><div class="mc-name">CHOR</div><div class="mc-pts">0 / 500</div><div class="mc-tag">Hide! 🤫</div></div>
+        <div class="mini-chit r-raja" style="--d:0s"><img class="mc-img" src="assets/raja.jpg" alt="Raja" loading="lazy" onerror="this.remove()" /><div class="mc-emoji">👑</div><div class="mc-name">RAJA</div><div class="mc-pts">1000 pts</div><div class="mc-tag">Lead 👑</div></div>
+        <div class="mini-chit r-mantri" style="--d:.6s"><img class="mc-img" src="assets/mantari.jpg" alt="Mantari" loading="lazy" onerror="this.remove()" /><div class="mc-emoji">🎩</div><div class="mc-name">MANTRI</div><div class="mc-pts">800 pts</div><div class="mc-tag">Plan 🎩</div></div>
+        <div class="mini-chit r-sipahi" style="--d:1.2s"><img class="mc-img" src="assets/sipahi.jpg" alt="Sipahi" loading="lazy" onerror="this.remove()" /><div class="mc-emoji">🕵️</div><div class="mc-name">SIPAHI</div><div class="mc-pts">500 / 0</div><div class="mc-tag">Catch 🔍</div></div>
+        <div class="mini-chit r-chor" style="--d:1.8s"><img class="mc-img" src="assets/chor.jpg" alt="Chor" loading="lazy" onerror="this.remove()" /><div class="mc-emoji">🥷</div><div class="mc-name">CHOR</div><div class="mc-pts">0 / 500</div><div class="mc-tag">Outsmart 🤫</div></div>
       </div>
       <div class="hero-cta-row">
         <a href="#play" class="btn primary big" id="btnPlayNow">✨ Play now</a>
@@ -86,6 +90,16 @@
       <div class="feat"><div class="fe">🎲</div><b>Fair crypto deal</b><span>Shuffled with crypto randomness, no repeat-role streaks.</span></div>
       <div class="feat"><div class="fe">🤖</div><b>Bots + live chat</b><span>Short of 4? Add bots. Alerts when anyone joins / leaves.</span></div>
       <div class="feat"><div class="fe">🔊</div><b>Sounds + endless</b><span>Round, hide, guess & win jingles. 1–500 rounds or ♾️.</span></div>
+    </div>
+    <div class="cast">
+      <h3>🎭 Meet the cast <span class="muted small">— your uploaded art, as-is</span></h3>
+      <div class="cast-grid">
+        <figure class="cast-card reveal"><img src="assets/raja.jpg" alt="Raja character sheet" loading="lazy" onerror="this.closest('.cast-card').classList.add('missing')" /><figcaption><b>👑 Raja — Lead</b><span>1000 pts · wise but playful</span></figcaption></figure>
+        <figure class="cast-card reveal"><img src="assets/mantari.jpg" alt="Mantari character sheet" loading="lazy" onerror="this.closest('.cast-card').classList.add('missing')" /><figcaption><b>🎩 Mantari — Plan</b><span>800 pts · strategist</span></figcaption></figure>
+        <figure class="cast-card reveal"><img src="assets/chor.jpg" alt="Chor character sheet" loading="lazy" onerror="this.closest('.cast-card').classList.add('missing')" /><figcaption><b>🥷 Chor — Outsmart</b><span>0 / 500 · sneaky & smart</span></figcaption></figure>
+        <figure class="cast-card reveal"><img src="assets/sipahi.jpg" alt="Sipahi character sheet" loading="lazy" onerror="this.closest('.cast-card').classList.add('missing')" /><figcaption><b>🕵️ Sipahi — Catch</b><span>500 / 0 · brave but fair</span></figcaption></figure>
+      </div>
+      <p class="muted small cast-note">Drop your 5 JPGs into <code>public/assets/</code> (hero-group, raja, mantari, chor, sipahi) — they appear here automatically with fallback to emoji if missing.</p>
     </div>
     <details class="how" id="how">
       <summary>📜 How to play</summary>
@@ -165,6 +179,7 @@
     <!-- chit -->
     <div id="chitZone" class="chit-zone">
       <div id="chitCard" class="chit">
+        <img id="chitImg" class="chit-img hidden" alt="role art" onerror="this.classList.add('hidden')" />
         <div id="chitEmoji" class="chit-emoji">❓</div>
         <div id="chitName" class="chit-name">???</div>
         <div id="chitPts" class="chit-pts"></div>
