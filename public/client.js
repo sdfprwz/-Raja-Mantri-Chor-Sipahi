@@ -25,8 +25,11 @@ function toast(msg) {
 const ROLE_META = {
   raja:   { emoji: '👑', name: 'RAJA',   pts: '1000 pts (fixed)', img: 'assets/raja.jpg' },
   mantri: { emoji: '🎩', name: 'MANTRI', pts: '800 pts (fixed)', img: 'assets/mantari.jpg' },
+  senapati: { emoji: '⚔️', name: 'SENAPATI', pts: '600 pts (fixed)', img: null },
   chor:   { emoji: '🥷', name: 'CHOR',   pts: '500 if hidden · 0 if caught', img: 'assets/chor.jpg' },
   sipahi: { emoji: '🕵️', name: 'SIPAHI', pts: '500 if catch · 0 if wrong', img: 'assets/sipahi.jpg' },
+  kotwal: { emoji: '🛡️', name: 'KOTWAL', pts: '400 pts (fixed)', img: null },
+  praja:  { emoji: '🧑‍🌾', name: 'PRAJA',  pts: '200 pts (fixed)', img: null },
 };
 function setChitImg(role) {
   const img = document.getElementById('chitImg');
@@ -40,6 +43,7 @@ function setChitImg(role) {
 }
 
 let myId = null, myRoom = null, myRole = null, isHost = false;
+let curMode = 'classic', curMaxPlayers = 4;
 let revealLeft = 0, revealInt = null, peekTimeout = null, guessInt = null, guessLeft = 0;
 let selectedSuspect = null, currentSuspects = [];
 let curTotalRounds = 5, curRound = 0;
@@ -107,6 +111,15 @@ $('btnSound').onclick = () => {
 
 // ---------------- Rounds: free choice 1..500 + ♾️ endless (0) ----------------
 const MAX_ROUNDS = 500;
+function fmtMode(mode, maxPlayers) {
+  return mode === 'variant' ? `Darbar ${maxPlayers || 6}P` : 'Classic 4P';
+}
+function setModeBadges() {
+  const t = fmtMode(curMode, curMaxPlayers);
+  const lb = $('lbMode'), g = $('gMode');
+  if (lb) { lb.textContent = t; lb.style.display = ''; }
+  if (g) { g.textContent = t; }
+}
 function fmtRounds(t) { return (!t || t === 0) ? '♾️ endless' : `${t} round${t === 1 ? '' : 's'}`; }
 function fmtRoundLabel(round, total) { return (!total || total === 0) ? `Round ${round} / ♾️` : `Round ${round}/${total}`; }
 function readRounds(numEl, endEl, fallback) {
@@ -136,11 +149,25 @@ setRoundsUI(midRounds, midEndless, 5);
   if (e) e.onchange = () => { if (n) n.disabled = e.checked; Sound.play('click'); };
 });
 
+// ---------- home: Classic vs Darbar Variant ----------
+const inMode = $('inMode'), inSeats = $('inSeats'), inSeatsWrap = $('inSeatsWrap');
+function syncSeatsWrap() {
+  if (inSeatsWrap) inSeatsWrap.style.display = (inMode && inMode.value === 'variant') ? '' : 'none';
+}
+if (inMode) inMode.onchange = () => { syncSeatsWrap(); Sound.play('click'); };
+syncSeatsWrap();
+function readSeats(fallback) {
+  let n = parseInt(inSeats && inSeats.value, 10);
+  if (!Number.isFinite(n)) return fallback || 6;
+  return Math.min(7, Math.max(5, n));
+}
+
 // ---------- home ----------
 $('btnCreate').onclick = () => {
   Sound.play('click');
   const name = $('inName').value.trim() || 'Player';
-  socket.emit('createRoom', { name, totalRounds: readRounds(inRounds, inEndless, 5) });
+  const mode = (inMode && inMode.value === 'variant') ? 'variant' : 'classic';
+  socket.emit('createRoom', { name, totalRounds: readRounds(inRounds, inEndless, 5), mode, maxPlayers: mode === 'variant' ? readSeats(6) : 4 });
 };
 $('btnJoin').onclick = () => {
   Sound.play('click');
@@ -159,7 +186,8 @@ socket.on('publicRooms', (list) => {
   list.forEach(r => {
     const d = document.createElement('div');
     d.className = 'roomitem';
-    d.innerHTML = `<span><b>${r.code}</b> · ${r.humans}👤 + ${r.bots}🤖 · ${fmtRounds(r.totalRounds)} · host ${escapeHtml(r.host)}</span>`;
+    const mode = r.mode || 'classic', cap = r.maxPlayers || 4;
+    d.innerHTML = `<span><b>${r.code}</b> · ${mode === 'variant' ? 'Darbar' : 'Classic'} ${r.humans + r.bots}/${cap} · ${fmtRounds(r.totalRounds)} · host ${escapeHtml(r.host)}</span>`;
     const b = document.createElement('button');
     b.className = 'btn small'; b.textContent = 'Join';
     b.onclick = () => {
@@ -175,11 +203,15 @@ socket.on('publicRooms', (list) => {
 socket.on('joined', (d) => {
   myId = d.playerId; myRoom = d.code;
   curRound = 0; prevPlayerCount = (d.players || []).length;
+  curMode = d.mode || 'classic'; curMaxPlayers = d.maxPlayers || (curMode === 'variant' ? 6 : 4);
   if (d.totalRounds !== undefined) {
     curTotalRounds = d.totalRounds;
     setRoundsUI(lbRounds, lbEndless, d.totalRounds);
     setRoundsUI(midRounds, midEndless, d.totalRounds);
   }
+  const lbSeats = $('lbSeats');
+  if (lbSeats) lbSeats.value = curMaxPlayers;
+  setModeBadges();
   $('gCode').textContent = d.code;
   renderInvite(d.code);
   // clean invite ?room= from URL once joined (keeps address bar tidy)
@@ -260,12 +292,18 @@ socket.on('roomUpdate', (room) => {
   if (room.code !== myRoom) return;
   myRoom = room.code;
   isHost = room.hostId === myId;
-  $('lbCode').textContent = room.code;
+  curMode = room.mode || 'classic'; curMaxPlayers = room.maxPlayers || (curMode === 'variant' ? 6 : 4);
+  setModeBadges();
+  const cap = curMaxPlayers;
+  $('lbCode').textContent = `${room.code} (${room.players.length}/${cap})`;
   $('gCode').textContent = room.code;
   renderInvite(room.code);
   curTotalRounds = room.totalRounds;
   setRoundsUI(lbRounds, lbEndless, room.totalRounds);
   setRoundsUI(midRounds, midEndless, room.totalRounds);
+  const lbSeats = $('lbSeats'), lbSeatsWrap = $('lbSeatsWrap');
+  if (lbSeatsWrap) lbSeatsWrap.style.display = (isHost && curMode === 'variant' && room.status === 'lobby') ? '' : 'none';
+  if (lbSeats && document.activeElement !== lbSeats) lbSeats.value = cap;
   if (curRound > 0) $('gRound').textContent = fmtRoundLabel(curRound, curTotalRounds);
   // join/leave sounds come from playerEvent (with toast) — avoid double jingle here
   prevPlayerCount = room.players.length;
@@ -291,9 +329,13 @@ socket.on('roomUpdate', (room) => {
   });
 
   $('hostControls').style.display = isHost ? 'flex' : 'none';
+  const lbHint = $('lbHint');
+  if (lbHint) lbHint.textContent = curMode === 'variant'
+    ? `Darbar Variant — ${cap} seats. Raja/Mantri/Sipahi reveal each round; Sipahi picks Chor from hidden suspects.`
+    : 'Share the QR / link with friends — they scan & join directly. Host can add bots 🤖 to fill seats.';
   $('lbWait').style.display = isHost ? 'none' : 'block';
   $('btnStart').disabled = room.players.length < 2 && false; // allow solo+ bots
-  $('btnAddBot').disabled = room.players.length >= 4;
+  $('btnAddBot').disabled = room.players.length >= cap;
   // keep host mid-game bar in sync (visible only to host during active game)
   if (room.status === 'lobby' || room.status === 'gameover') {
     $('midGameControls').classList.add('hidden');
@@ -310,10 +352,18 @@ $('btnCopy').onclick = async () => {
 $('btnAddBot').onclick = () => { Sound.play('click'); socket.emit('addBot'); };
 function pushLobbyRounds() {
   const t = readRounds(lbRounds, lbEndless, curTotalRounds || 5);
-  socket.emit('updateSettings', { totalRounds: t });
+  const payload = { totalRounds: t };
+  if (curMode === 'variant') {
+    const lbSeats = $('lbSeats');
+    let n = parseInt(lbSeats && lbSeats.value, 10);
+    if (Number.isFinite(n)) payload.maxPlayers = Math.min(7, Math.max(5, n));
+  }
+  socket.emit('updateSettings', payload);
 }
 lbRounds.onchange = pushLobbyRounds;
 if (lbEndless) lbEndless.onchange = pushLobbyRounds;
+const _lbSeats = $('lbSeats');
+if (_lbSeats) _lbSeats.onchange = pushLobbyRounds;
 $('btnStart').onclick = () => { Sound.play('click'); socket.emit('startGame'); };
 $('btnLeave1').onclick = () => { socket.emit('leaveRoom'); location.reload(); };
 $('btnLeave2').onclick = () => { socket.emit('leaveRoom'); location.reload(); };
@@ -331,9 +381,12 @@ $('btnEndGame').onclick = () => {
   Sound.play('click');
   if (confirm('End the game now and show the winner?')) socket.emit('endGame');
 };
-socket.on('roundsUpdated', ({ totalRounds, currentRound }) => {
+socket.on('roundsUpdated', ({ totalRounds, currentRound, maxPlayers, mode }) => {
   curTotalRounds = totalRounds;
   if (currentRound) curRound = currentRound;
+  if (mode) curMode = mode;
+  if (maxPlayers) { curMaxPlayers = maxPlayers; const s = $('lbSeats'); if (s) s.value = maxPlayers; }
+  setModeBadges();
   setRoundsUI(lbRounds, lbEndless, totalRounds);
   setRoundsUI(midRounds, midEndless, totalRounds);
   if (curRound > 0) $('gRound').textContent = fmtRoundLabel(curRound, curTotalRounds);
@@ -342,9 +395,12 @@ socket.on('roundsUpdated', ({ totalRounds, currentRound }) => {
 });
 
 // ---------- rounds ----------
-socket.on('roundAnnounce', ({ round, totalRounds }) => {
+socket.on('roundAnnounce', ({ round, totalRounds, mode, maxPlayers }) => {
   show('screen-game');
   curRound = round; curTotalRounds = totalRounds;
+  if (mode) curMode = mode;
+  if (maxPlayers) curMaxPlayers = maxPlayers;
+  setModeBadges();
   setRoundsUI(midRounds, midEndless, totalRounds);
   refreshMidGame();
   Sound.play('roundStart');
@@ -358,6 +414,9 @@ socket.on('roundAnnounce', ({ round, totalRounds }) => {
 socket.on('roundStarted', (d) => {
   show('screen-game');
   curRound = d.round; curTotalRounds = d.totalRounds;
+  if (d.mode) curMode = d.mode;
+  if (d.maxPlayers) curMaxPlayers = d.maxPlayers;
+  setModeBadges();
   setRoundsUI(midRounds, midEndless, d.totalRounds);
   refreshMidGame();
   Sound.play('roundStart');
@@ -383,7 +442,7 @@ function renderScores(players) {
 }
 
 function showChit(role, secs) {
-  const meta = ROLE_META[role];
+  const meta = ROLE_META[role] || { emoji: '❓', name: String(role).toUpperCase(), pts: '' };
   const card = $('chitCard');
   card.classList.remove('hidden-chit');
   card.classList.add('chit-reveal');
@@ -449,14 +508,32 @@ socket.on('guessPhase', (d) => {
   gz.classList.remove('hidden');
   currentSuspects = d.suspects;
   selectedSuspect = null;
+  if (d.mode) curMode = d.mode;
 
+  const isVariant = curMode === 'variant';
   const iAm = d.sipahiId === myId;
   Sound.play(iAm ? 'yourTurn' : 'waiting');
+
+  // Variant: Raja/Mantri/Sipahi are public — show the reveal strip.
+  const revBar = $('revealedBar');
+  if (revBar) {
+    if (isVariant && d.revealed && d.revealed.length) {
+      revBar.classList.remove('hidden');
+      revBar.innerHTML = '<span class="muted">Revealed:</span> ' + d.revealed.map(r => {
+        const m = ROLE_META[r.role] || { emoji: '❓', name: r.role };
+        return `<span class="rev">${m.emoji} ${m.name} = ${escapeHtml(r.name)}</span>`;
+      }).join(' ');
+    } else {
+      revBar.classList.add('hidden');
+      revBar.innerHTML = '';
+    }
+  }
+
   $('guessTitle').textContent = iAm
-    ? '🕵️ You are the SIPAHI — catch the CHOR!'
-    : `🕵️ ${d.sipahiName} (Sipahi) is choosing…`;
+    ? (isVariant ? `🕵️ You are SIPAHI — ${d.suspects.length} hidden suspects, 1 is Chor!` : '🕵️ You are the SIPAHI — catch the CHOR!')
+    : (isVariant ? `🕵️ ${d.sipahiName} picks from ${d.suspects.length} suspects…` : `🕵️ ${d.sipahiName} (Sipahi) is choosing…`);
   $('guessSub').textContent = iAm
-    ? 'Tap a suspect below, then Confirm. Wrong guess = points swapped!'
+    ? (isVariant ? 'Raja/Mantri can’t be Chor — tap a hidden suspect, then Confirm.' : 'Tap a suspect below, then Confirm. Wrong guess = points swapped!')
     : 'Wait… the Sipahi is interrogating suspects. 🤫';
 
   const box = $('suspects');
@@ -464,7 +541,7 @@ socket.on('guessPhase', (d) => {
   d.suspects.forEach(s => {
     const div = document.createElement('div');
     div.className = 'suspect';
-    div.innerHTML = `<span>🕵️ ${escapeHtml(s.name)} ${s.isBot ? '🤖' : ''}</span><span>${iAm ? '👉' : '…'}</span>`;
+    div.innerHTML = `<span>❓ ${escapeHtml(s.name)} ${s.isBot ? '🤖' : ''}</span><span>${iAm ? '👉' : '…'}</span>`;
     if (iAm) {
       div.onclick = () => {
         Sound.play('click');
@@ -530,7 +607,7 @@ socket.on('roundResult', (d) => {
   const cards = $('resCards');
   cards.innerHTML = '';
   Object.entries(d.roles).forEach(([id, r]) => {
-    const m = ROLE_META[r.role];
+    const m = ROLE_META[r.role] || { emoji: '❓', name: String(r.role).toUpperCase(), img: null };
     const div = document.createElement('div');
     div.className = 'rescard';
     const imgHtml = m.img ? `<img class="res-img" src="${m.img}" alt="${m.name}" loading="lazy" onerror="this.remove()" />` : '';
@@ -575,7 +652,7 @@ socket.on('gameOver', (d) => {
     : `🏆 ${d.winner.name} wins with ${d.winner.score} pts!`;
   const pod = $('podium');
   pod.innerHTML = '';
-  const medals = ['🥇', '🥈', '🥉', '4️⃣'];
+  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
   [...d.players].sort((a, b) => b.score - a.score).forEach((p, i) => {
     const div = document.createElement('div');
     div.className = 'player';

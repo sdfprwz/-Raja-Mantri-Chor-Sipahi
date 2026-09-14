@@ -85,10 +85,24 @@
           <div id="play" class="play-panel">
             <div class="play-head"><h2>Start playing</h2><p class="muted">Create a room and share the QR — or join with a code.</p></div>
             <div class="rules-mini">
-              <span>Raja <b>1000</b></span><span>Mantri <b>800</b></span><span>Sipahi <b>500 / 0</b></span><span>Chor <b>0 / 500</b></span>
+              <span>Classic 4P: Raja <b>1000</b> · Mantri <b>800</b> · Sipahi <b>500 / 0</b> · Chor <b>0 / 500</b></span>
+              <span>Darbar 5–7P adds: Senapati <b>600</b> · Kotwal <b>400</b> · Praja <b>200</b> (reveals Raja/Mantri/Sipahi)</span>
             </div>
             <label class="lbl">Your name</label>
             <input id="inName" maxlength="15" placeholder="e.g. Arjun" />
+            <div class="row">
+              <div class="grow">
+                <label class="lbl">Game mode</label>
+                <select id="inMode">
+                  <option value="classic" selected>Classic — 4 players</option>
+                  <option value="variant">Darbar Variant — 5 to 7 players</option>
+                </select>
+              </div>
+              <div class="grow" id="inSeatsWrap" style="display:none">
+                <label class="lbl">Seats (5–7)</label>
+                <input id="inSeats" type="number" min="5" max="7" step="1" value="6" />
+              </div>
+            </div>
             <div class="row">
               <div class="grow">
                 <label class="lbl">Rounds (1–500, or endless)</label>
@@ -111,9 +125,10 @@
             <details class="how" id="how">
               <summary>How to play</summary>
               <ol>
-                <li>4 chits — <b>Raja, Mantri, Chor, Sipahi</b> — are dealt secretly each round.</li>
+                <li><b>Classic (4P):</b> 4 chits — <b>Raja, Mantri, Chor, Sipahi</b> — dealt secretly each round.</li>
+                <li><b>Darbar Variant (5–7P):</b> adds <b>Senapati 600, Kotwal 400, Praja 200</b>. Raja, Mantri & Sipahi are <b>revealed to everyone</b> after the peek — rest are hidden <b>suspects</b>, only one is the real Chor. Raja/Mantri can never be Chor.</li>
                 <li>Your chit shows for <b>7 seconds</b> then hides. Use <b>Peek</b> to glance again briefly.</li>
-                <li><b>Sipahi</b> must catch the <b>Chor</b> by picking a suspect.</li>
+                <li><b>Sipahi</b> must catch the <b>Chor</b> by picking a suspect (variant: only from hidden suspects).</li>
                 <li>Correct guess → Sipahi <b>500</b>, Chor <b>0</b>. Wrong guess → swapped! Raja <b>1000</b>, Mantri <b>800</b> fixed.</li>
                 <li>Most points after all rounds wins. Short of 4 friends? Add bots.</li>
                 <li>Host picks <b>any 1–500 rounds, or endless</b> — and can extend/shorten mid-game.</li>
@@ -133,7 +148,7 @@
   <!-- LOBBY -->
   <section id="screen-lobby" class="card hidden">
     <div class="roomhdr">
-      <h2>Room <span id="lbCode" class="code"></span></h2>
+      <h2>Room <span id="lbCode" class="code"></span> <span id="lbMode" class="badge host"></span></h2>
       <div>
         <button id="btnCopy" class="btn small">📋 Copy code</button>
         <button id="btnLeave1" class="btn small danger">Leave</button>
@@ -164,6 +179,10 @@
           <label class="endless-check"><input id="lbEndless" type="checkbox" /> ♾️</label>
         </div>
       </div>
+      <div class="grow" id="lbSeatsWrap" style="display:none">
+        <label class="lbl">Seats (5–7, lobby only)</label>
+        <input id="lbSeats" type="number" min="5" max="7" step="1" value="6" />
+      </div>
       <div class="grow" style="display:flex;align-items:flex-end;gap:8px">
         <button id="btnAddBot" class="btn">🤖 Add bot</button>
         <button id="btnStart" class="btn primary">▶ Start game</button>
@@ -175,7 +194,7 @@
   <!-- GAME -->
   <section id="screen-game" class="card hidden">
     <div class="roomhdr">
-      <h2 id="gRound">Round 1/5</h2>
+      <h2><span id="gMode" class="badge host"></span> <span id="gRound">Round 1/5</span></h2>
       <div><span id="gCode" class="code"></span>
         <button id="btnLeave2" class="btn small danger">Leave</button>
       </div>
@@ -209,6 +228,7 @@
     <div id="guessZone" class="hidden">
       <h3 id="guessTitle">🕵️ Sipahi is thinking…</h3>
       <p class="muted" id="guessSub"></p>
+      <div id="revealedBar" class="revealed hidden"></div>
       <div id="suspects" class="suspects"></div>
       <div id="guessTimerWrap">⏱ <span id="guessTimer">30</span>s left</div>
     </div>

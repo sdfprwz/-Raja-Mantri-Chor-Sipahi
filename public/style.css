@@ -42,7 +42,7 @@ input:focus,select:focus{border-color:var(--gold)}
 .badge{font-size:12px;background:#ffffff18;padding:2px 8px;border-radius:999px;margin-left:6px}
 .badge.host{background:var(--gold);color:#3a2500;font-weight:800}
 .badge.bot{background:var(--acc)}
-.scorebar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.scorebar{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:12px 0}
 .score{background:#00000040;border:1px solid #ffffff14;border-radius:12px;padding:8px;text-align:center;font-size:13px}
 .score b{display:block;font-size:16px;color:var(--gold)}
 .chit-zone{text-align:center;padding:10px 0}
@@ -253,3 +253,9 @@ body{overflow-x:hidden}
 .res-info small{color:var(--gold);font-weight:800}
 @media(max-width:560px){.hero-chits{grid-template-columns:repeat(2,1fr);max-width:340px}.hero-stats{grid-template-columns:repeat(2,1fr);max-width:340px}.features{grid-template-columns:1fr}.cast-grid{grid-template-columns:1fr}}
 @media(max-width:480px){.scorebar{grid-template-columns:repeat(2,1fr)}.rescards{grid-template-columns:repeat(2,1fr)}}
+/* ---------- Darbar variant: public reveals ---------- */
+.revealed{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.revealed .rev{background:#f5c5421e;border:1px solid #f5c54255;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:700}
+.revealed .rev small{color:var(--muted);font-weight:400}
+#gMode{margin:0 6px 0 0;vertical-align:middle}
+#lbMode{vertical-align:middle}

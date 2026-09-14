@@ -34,12 +34,15 @@ app.get('*', (req, res) => {
 // ---------------- Game state ----------------
 const rooms = new Map(); // code -> room
 
-const ROLE_POINTS = { raja: 1000, mantri: 800, sipahi: 500, chor: 0 };
+const ROLE_POINTS = { raja: 1000, mantri: 800, senapati: 600, sipahi: 500, kotwal: 400, praja: 200, chor: 0 };
 const REVEAL_SECONDS = 7;
 const GUESS_SECONDS = 30;
 const CHAT_MAXLEN = 300;
 const CHAT_HISTORY = 50;
-const BOT_NAMES = ['Chintu 🤖', 'Bunty 🤖', 'Guddu 🤖', 'Pinki 🤖', 'Monty 🤖'];
+const BOT_NAMES = ['Chintu 🤖', 'Bunty 🤖', 'Guddu 🤖', 'Pinki 🤖', 'Monty 🤖', 'Chhotu 🤖', 'Raju 🤖'];
+const CLASSIC_PLAYERS = 4;
+const MIN_VARIANT_PLAYERS = 5;
+const MAX_PLAYERS = 7;
 // No hard round cap anymore — host picks any 1..MAX_ROUNDS, or 0 = ♾️ endless.
 const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 500;
@@ -63,6 +66,59 @@ function formatRounds(totalRounds) {
 
 function isLastRound(room) {
   return room.totalRounds > 0 && room.currentRound >= room.totalRounds;
+}
+
+// ---- Classic vs Variant (Darbar) ----
+function parseMode(v) {
+  return String(v || '').toLowerCase() === 'variant' ? 'variant' : 'classic';
+}
+
+function parseMaxPlayers(v, mode, fallback) {
+  if (mode !== 'variant') return CLASSIC_PLAYERS;
+  const fb = fallback || 6;
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return Math.min(MAX_PLAYERS, Math.max(MIN_VARIANT_PLAYERS, fb));
+  return Math.min(MAX_PLAYERS, Math.max(MIN_VARIANT_PLAYERS, n));
+}
+
+function modeLabel(room) {
+  if (!room || room.mode !== 'variant') return 'Classic';
+  return `Darbar ${room.maxPlayers}P`;
+}
+
+// Role chits per mode / seats. Classic is frozen (4). Variant adds court roles.
+function roleSetFor(room) {
+  if (!room || room.mode !== 'variant') return ['raja', 'mantri', 'chor', 'sipahi'];
+  const n = room.players ? Math.max(room.players.length, room.maxPlayers || 0) : (room.maxPlayers || 6);
+  // Base order ensures core roles present even if short-seated; slice to seats.
+  const full = ['raja', 'mantri', 'sipahi', 'chor', 'senapati', 'kotwal', 'praja'];
+  return full.slice(0, Math.min(MAX_PLAYERS, Math.max(MIN_VARIANT_PLAYERS, n || 6)));
+}
+
+function suspectsFor(room) {
+  const sipahi = room.players.find(p => room.roles[p.id] === 'sipahi');
+  if (room.mode === 'variant') {
+    const known = new Set();
+    room.players.forEach(p => {
+      const r = room.roles[p.id];
+      if (r === 'raja' || r === 'mantri' || r === 'sipahi') known.add(p.id);
+    });
+    return room.players.filter(p => !known.has(p.id)).map(p => ({ id: p.id, name: p.name, isBot: p.isBot }));
+  }
+  return room.players.filter(p => p.id !== sipahi.id).map(p => ({ id: p.id, name: p.name, isBot: p.isBot }));
+}
+
+function revealedFor(room) {
+  if (room.mode !== 'variant') return [];
+  return room.players
+    .filter(p => ['raja', 'mantri', 'sipahi'].includes(room.roles[p.id]))
+    .map(p => ({ id: p.id, name: p.name, role: room.roles[p.id], isBot: p.isBot }));
+}
+
+function guessSecondsFor(room) {
+  if (room.mode !== 'variant') return GUESS_SECONDS;
+  const nSus = Math.max(2, (room.players.length || 0) - 3);
+  return GUESS_SECONDS + Math.max(0, nSus - 3) * 5;
 }
 
 function genCode() {
@@ -95,7 +151,7 @@ function shuffle(arr) {
 // possible). Pure Math.random() streaks made repeats feel rigged, so we
 // re-shuffle until the deal differs from last round for every seated player.
 function dealRoles(room) {
-  const base = ['raja', 'mantri', 'chor', 'sipahi'];
+  const base = roleSetFor(room).slice(0, room.players.length);
   let best = shuffle(base);
   let bestRepeats = countRepeats(room, best);
   for (let t = 1; t < 60 && bestRepeats > 0; t++) {
@@ -133,20 +189,28 @@ function broadcastLobby(room) {
     hostId: room.hostId,
     status: room.status,
     totalRounds: room.totalRounds,
-    currentRound: room.currentRound
+    currentRound: room.currentRound,
+    mode: room.mode || 'classic',
+    maxPlayers: room.maxPlayers || CLASSIC_PLAYERS
   });
+}
+
+function roomCard(r) {
+  return {
+    code: r.code,
+    humans: r.players.filter(p => !p.isBot).length,
+    bots: r.players.filter(p => p.isBot).length,
+    totalRounds: r.totalRounds,
+    host: (r.players.find(p => p.id === r.hostId) || {}).name || '—',
+    mode: r.mode || 'classic',
+    maxPlayers: r.maxPlayers || CLASSIC_PLAYERS
+  };
 }
 
 function broadcastPublicRooms() {
   const list = [...rooms.values()]
-    .filter(r => r.status === 'lobby' && r.players.filter(p => !p.isBot).length < 4)
-    .map(r => ({
-      code: r.code,
-      humans: r.players.filter(p => !p.isBot).length,
-      bots: r.players.filter(p => p.isBot).length,
-      totalRounds: r.totalRounds,
-      host: (r.players.find(p => p.id === r.hostId) || {}).name || '—'
-    }));
+    .filter(r => r.status === 'lobby' && r.players.filter(p => !p.isBot).length < (r.maxPlayers || CLASSIC_PLAYERS))
+    .map(roomCard);
   io.emit('publicRooms', list);
 }
 
@@ -194,10 +258,12 @@ function startRound(room) {
     sock.emit('roundStarted', {
       round: room.currentRound,
       totalRounds: room.totalRounds,
+      mode: room.mode || 'classic',
+      maxPlayers: room.maxPlayers || CLASSIC_PLAYERS,
       myRole: room.roles[p.id],
       players: publicPlayers(room),
       revealSeconds: REVEAL_SECONDS,
-      guessSeconds: GUESS_SECONDS,
+      guessSeconds: guessSecondsFor(room),
       sipahiId: sipahi.id,
       sipahiName: sipahi.name,
       iAmSipahi: sipahi.id === p.id
@@ -205,7 +271,8 @@ function startRound(room) {
   });
 
   io.to(room.code).emit('roundAnnounce', {
-    round: room.currentRound, totalRounds: room.totalRounds
+    round: room.currentRound, totalRounds: room.totalRounds,
+    mode: room.mode || 'classic', maxPlayers: room.maxPlayers || CLASSIC_PLAYERS
   });
   broadcastLobby(room);
 
@@ -217,15 +284,17 @@ function openGuessPhase(room) {
   if (room.status !== 'reveal') return;
   room.status = 'guess';
   const sipahi = room.players.find(p => room.roles[p.id] === 'sipahi');
-  const suspects = room.players
-    .filter(p => p.id !== sipahi.id)
-    .map(p => ({ id: p.id, name: p.name, isBot: p.isBot }));
+  const suspects = suspectsFor(room);
+  const revealed = revealedFor(room);
+  const guessSeconds = guessSecondsFor(room);
 
   io.to(room.code).emit('guessPhase', {
     sipahiId: sipahi.id,
     sipahiName: sipahi.name,
     suspects,
-    guessSeconds: GUESS_SECONDS
+    revealed,
+    mode: room.mode || 'classic',
+    guessSeconds
   });
   broadcastLobby(room);
 
@@ -240,7 +309,7 @@ function openGuessPhase(room) {
     room.guessTimer = setTimeout(() => {
       const pick = pickRandom(suspects);
       resolveGuess(room, sipahi.id, pick.id, true);
-    }, GUESS_SECONDS * 1000);
+    }, guessSeconds * 1000);
   }
 }
 
@@ -252,14 +321,17 @@ function resolveGuess(room, sipahiId, suspectId, auto = false) {
   const actualChor = room.players.find(p => room.roles[p.id] === 'chor');
   const correct = suspectId === actualChor.id;
 
-  // scoring
+  // scoring (classic frozen; variant court roles are fixed points)
   const roundPoints = {};
   room.players.forEach(p => {
     const role = room.roles[p.id];
     let pts = 0;
     if (role === 'raja') pts = 1000;
     else if (role === 'mantri') pts = 800;
+    else if (role === 'senapati') pts = 600;
     else if (role === 'sipahi') pts = correct ? 500 : 0;
+    else if (role === 'kotwal') pts = 400;
+    else if (role === 'praja') pts = 200;
     else if (role === 'chor') pts = correct ? 0 : 500;
     p.score += pts;
     roundPoints[p.id] = pts;
@@ -292,33 +364,24 @@ function resolveGuess(room, sipahiId, suspectId, auto = false) {
 io.on('connection', (socket) => {
   socket.emit('publicRooms', [...rooms.values()]
     .filter(r => r.status === 'lobby')
-    .map(r => ({
-      code: r.code,
-      humans: r.players.filter(p => !p.isBot).length,
-      bots: r.players.filter(p => p.isBot).length,
-      totalRounds: r.totalRounds,
-      host: (r.players.find(p => p.id === r.hostId) || {}).name || '—'
-    })));
+    .map(roomCard));
 
   socket.on('getRooms', () => {
     socket.emit('publicRooms', [...rooms.values()]
       .filter(r => r.status === 'lobby')
-      .map(r => ({
-        code: r.code,
-        humans: r.players.filter(p => !p.isBot).length,
-        bots: r.players.filter(p => p.isBot).length,
-        totalRounds: r.totalRounds,
-        host: (r.players.find(p => p.id === r.hostId) || {}).name || '—'
-      })));
+      .map(roomCard));
   });
 
-  socket.on('createRoom', ({ name, totalRounds }) => {
+  socket.on('createRoom', ({ name, totalRounds, mode, maxPlayers }) => {
     name = String(name || '').trim().slice(0, 15) || 'Player';
     totalRounds = parseTotalRounds(totalRounds, 5);
+    mode = parseMode(mode);
+    maxPlayers = parseMaxPlayers(maxPlayers, mode, 6);
     const code = genCode();
     const playerId = 'p_' + Math.random().toString(36).slice(2, 9);
     const room = {
       code, hostId: playerId, status: 'lobby',
+      mode, maxPlayers,
       totalRounds, currentRound: 0,
       players: [{ id: playerId, socketId: socket.id, name, isBot: false, score: 0, connected: true }],
       roles: {}, lastRoles: null, guess: null, result: null, messages: [],
@@ -328,8 +391,8 @@ io.on('connection', (socket) => {
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.playerId = playerId;
-    socket.emit('joined', { code, playerId, players: publicPlayers(room), hostId: playerId, totalRounds, chat: room.messages });
-    sysMsg(room, `👑 ${name} created the room — share the code to invite friends!`);
+    socket.emit('joined', { code, playerId, players: publicPlayers(room), hostId: playerId, totalRounds, mode, maxPlayers, chat: room.messages });
+    sysMsg(room, `👑 ${name} created a ${mode === 'variant' ? `Darbar ${maxPlayers}P` : 'Classic 4P'} room — share the code to invite friends!`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -340,15 +403,16 @@ io.on('connection', (socket) => {
     if (!room) return socket.emit('errorMsg', 'Room not found. Check the code.');
     if (room.status !== 'lobby') return socket.emit('errorMsg', 'Game already started in this room.');
     const humans = room.players.filter(p => !p.isBot).length;
-    if (humans >= 4 || room.players.length >= 4) return socket.emit('errorMsg', 'Room is full (4/4).');
+    const cap = room.maxPlayers || CLASSIC_PLAYERS;
+    if (humans >= cap || room.players.length >= cap) return socket.emit('errorMsg', `Room is full (${room.players.length}/${cap}).`);
     name = String(name || '').trim().slice(0, 15) || 'Player';
     const playerId = 'p_' + Math.random().toString(36).slice(2, 9);
     room.players.push({ id: playerId, socketId: socket.id, name, isBot: false, score: 0, connected: true });
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
     socket.data.playerId = playerId;
-    socket.emit('joined', { code: roomCode, playerId, players: publicPlayers(room), hostId: room.hostId, totalRounds: room.totalRounds, chat: room.messages });
-    announce(room, 'join', `👋 ${name} joined the room (${room.players.length}/4)`);
+    socket.emit('joined', { code: roomCode, playerId, players: publicPlayers(room), hostId: room.hostId, totalRounds: room.totalRounds, mode: room.mode || 'classic', maxPlayers: cap, chat: room.messages });
+    announce(room, 'join', `👋 ${name} joined the room (${room.players.length}/${cap})`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -366,13 +430,14 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('updateSettings', ({ totalRounds }) => {
+  socket.on('updateSettings', ({ totalRounds, maxPlayers }) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return;
     if (socket.data.playerId !== room.hostId) return;
     // Host can set/change rounds in lobby AND mid-game (to extend/shorten/endless).
     // In lobby any value allowed; mid-game only allow increasing or switching to
     // endless / a value still ahead of currentRound to avoid retroactive game-over.
+    // Seats (maxPlayers) can only change in lobby for variant rooms.
     if (room.status === 'gameover') return;
     const next = parseTotalRounds(totalRounds, room.totalRounds);
     if (room.status !== 'lobby') {
@@ -381,8 +446,20 @@ io.on('connection', (socket) => {
       }
     }
     room.totalRounds = next;
-    sysMsg(room, `⚙️ Host set rounds to ${formatRounds(next)}`);
-    io.to(room.code).emit('roundsUpdated', { totalRounds: next, currentRound: room.currentRound });
+    let seatsMsg = '';
+    if (room.status === 'lobby' && room.mode === 'variant' && maxPlayers !== undefined) {
+      const cap = parseMaxPlayers(maxPlayers, room.mode, room.maxPlayers);
+      if (cap !== room.maxPlayers) {
+        if (cap < room.players.length) {
+          socket.emit('errorMsg', `Can't shrink to ${cap} — ${room.players.length} seats taken. Remove bots first.`);
+        } else {
+          room.maxPlayers = cap;
+          seatsMsg = ` · seats ${cap}`;
+        }
+      }
+    }
+    sysMsg(room, `⚙️ Host set rounds to ${formatRounds(next)}${seatsMsg}`);
+    io.to(room.code).emit('roundsUpdated', { totalRounds: next, currentRound: room.currentRound, maxPlayers: room.maxPlayers, mode: room.mode });
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -391,12 +468,13 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.status !== 'lobby') return;
     if (socket.data.playerId !== room.hostId) return;
-    if (room.players.length >= 4) return socket.emit('errorMsg', 'Room already has 4 players.');
+    const cap = room.maxPlayers || CLASSIC_PLAYERS;
+    if (room.players.length >= cap) return socket.emit('errorMsg', `Room already has ${cap} players.`);
     const used = new Set(room.players.map(p => p.name));
     const botName = BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + (100 + randInt(900)) + ' 🤖');
     const botId = 'p_' + Math.random().toString(36).slice(2, 9);
     room.players.push({ id: botId, socketId: null, name: botName, isBot: true, score: 0, connected: true });
-    announce(room, 'botJoin', `🤖 ${botName} joined the room (bot) — ${room.players.length}/4 seats filled`);
+    announce(room, 'botJoin', `🤖 ${botName} joined the room (bot) — ${room.players.length}/${cap} seats filled`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -407,7 +485,7 @@ io.on('connection', (socket) => {
     if (socket.data.playerId !== room.hostId) return;
     const gone = room.players.find(p => p.id === botId && p.isBot);
     room.players = room.players.filter(p => !(p.id === botId && p.isBot));
-    if (gone) announce(room, 'botRemove', `🤖 ${gone.name} was removed (${room.players.length}/4)`);
+    if (gone) announce(room, 'botRemove', `🤖 ${gone.name} was removed (${room.players.length}/${room.maxPlayers || CLASSIC_PLAYERS})`);
     broadcastLobby(room);
     broadcastPublicRooms();
   });
@@ -416,8 +494,9 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.status !== 'lobby') return;
     if (socket.data.playerId !== room.hostId) return socket.emit('errorMsg', 'Only host can start.');
-    // auto-fill with bots if fewer than 4
-    while (room.players.length < 4) {
+    const cap = room.maxPlayers || CLASSIC_PLAYERS;
+    // auto-fill with bots if fewer than cap (classic 4 frozen, variant 5-7)
+    while (room.players.length < cap) {
       const used = new Set(room.players.map(p => p.name));
       const botName = BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + (100 + randInt(900)) + ' 🤖');
       room.players.push({ id: 'p_' + Math.random().toString(36).slice(2, 9), socketId: null, name: botName, isBot: true, score: 0, connected: true });
@@ -427,8 +506,8 @@ io.on('connection', (socket) => {
     room.lastRoles = null;
     broadcastPublicRooms();
     sysMsg(room, room.totalRounds === 0
-      ? `🎮 Game started — ♾️ endless mode! Host ends it with 🏁 End game. Good luck!`
-      : `🎮 Game started — ${room.totalRounds} round(s). Good luck!`);
+      ? `🎮 Game started — ${modeLabel(room)} · ♾️ endless mode! Host ends it with 🏁 End game. Good luck!`
+      : `🎮 Game started — ${modeLabel(room)} · ${room.totalRounds} round(s). Good luck!`);
     startRound(room);
   });
 
@@ -437,7 +516,13 @@ io.on('connection', (socket) => {
     if (!room || room.status !== 'guess') return;
     const sipahi = room.players.find(p => room.roles[p.id] === 'sipahi');
     if (!sipahi || sipahi.id !== socket.data.playerId) return socket.emit('errorMsg', 'Only Sipahi can guess.');
-    if (!room.players.some(p => p.id === suspectId && p.id !== sipahi.id)) return;
+    if (room.mode === 'variant') {
+      // Raja/Mantri can never be Chor — only hidden suspects are valid targets.
+      const ok = suspectsFor(room).some(s => s.id === suspectId);
+      if (!ok) return socket.emit('errorMsg', 'Pick a suspect — Raja/Mantri cannot be Chor.');
+    } else {
+      if (!room.players.some(p => p.id === suspectId && p.id !== sipahi.id)) return;
+    }
     resolveGuess(room, sipahi.id, suspectId, false);
   });
 
@@ -515,7 +600,7 @@ io.on('connection', (socket) => {
         clearTimers(room);
         rooms.delete(code);
       } else {
-        announce(room, 'leave', `👋 ${leaverName} left the room (${room.players.length}/4)`);
+        announce(room, 'leave', `👋 ${leaverName} left the room (${room.players.length}/${room.maxPlayers || CLASSIC_PLAYERS})`);
         broadcastLobby(room);
       }
     } else {
@@ -535,7 +620,7 @@ io.on('connection', (socket) => {
         if (sipahi && sipahi.id === pid) {
           clearTimers(room);
           room.botTimer = setTimeout(() => {
-            const suspects = room.players.filter(p => p.id !== sipahi.id);
+            const suspects = suspectsFor(room);
             const pick = pickRandom(suspects);
             resolveGuess(room, sipahi.id, pick.id, true);
           }, 2500);
