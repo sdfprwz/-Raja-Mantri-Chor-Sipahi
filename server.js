@@ -1,3 +1,17 @@
+/**
+ * 👑 Raja Mantri Chor Sipahi — multiplayer game server.
+ *
+ * Stack: Express (static hosting for `public/`) + Socket.IO (rooms, rounds, chat).
+ * Storage: in-memory only — `rooms` Map, no database. All rooms reset on restart.
+ *
+ * Game modes:
+ *  - classic (4P): Raja 1000, Mantri 800, Sipahi 500/0, Chor 0/500. Sipahi picks any other player.
+ *  - variant "Darbar" (5-7P): adds Senapati 600, Kotwal 400, Praja 200.
+ *    Raja/Mantri/Sipahi are publicly revealed each round; Sipahi picks only from hidden suspects.
+ *
+ * Round flow per room: lobby -> reveal (7s, private chits) -> guess (timed) -> result -> next/lobby/gameover.
+ * Bots fill empty seats, auto-guess as Sipahi, and take over when humans disconnect mid-game.
+ */
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -32,17 +46,21 @@ app.get('*', (req, res) => {
 });
 
 // ---------------- Game state ----------------
+// In-memory store: room code (e.g. "AB12") -> room object.
+// Room = { code, hostId, status, mode, maxPlayers, totalRounds (0 = endless),
+//          currentRound, players[], roles{}, lastRoles, guess, result, messages[], timers }.
 const rooms = new Map(); // code -> room
 
+// Fixed points per role. Sipahi/Chor are conditional (see resolveGuess); the rest always score face value.
 const ROLE_POINTS = { raja: 1000, mantri: 800, senapati: 600, sipahi: 500, kotwal: 400, praja: 200, chor: 0 };
-const REVEAL_SECONDS = 7;
-const GUESS_SECONDS = 30;
-const CHAT_MAXLEN = 300;
-const CHAT_HISTORY = 50;
+const REVEAL_SECONDS = 7; // private chit visible window before auto-hide (anti-sneak)
+const GUESS_SECONDS = 30; // base Sipahi guess timer (variant adds +5s per extra suspect beyond 3)
+const CHAT_MAXLEN = 300; // max chars per chat message
+const CHAT_HISTORY = 50; // last N messages kept per room (in-memory)
 const BOT_NAMES = ['Chintu 🤖', 'Bunty 🤖', 'Guddu 🤖', 'Pinki 🤖', 'Monty 🤖', 'Chhotu 🤖', 'Raju 🤖'];
-const CLASSIC_PLAYERS = 4;
-const MIN_VARIANT_PLAYERS = 5;
-const MAX_PLAYERS = 7;
+const CLASSIC_PLAYERS = 4; // Classic mode is frozen at 4 seats
+const MIN_VARIANT_PLAYERS = 5; // Darbar variant seat range…
+const MAX_PLAYERS = 7; // …5 to 7 players
 // No hard round cap anymore — host picks any 1..MAX_ROUNDS, or 0 = ♾️ endless.
 const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 500;
@@ -69,10 +87,14 @@ function isLastRound(room) {
 }
 
 // ---- Classic vs Variant (Darbar) ----
+// Normalises any client value to 'variant' or 'classic' (default). Unknown values fall back to classic.
+/** Parse the requested game mode; anything but "variant" becomes "classic". */
 function parseMode(v) {
   return String(v || '').toLowerCase() === 'variant' ? 'variant' : 'classic';
 }
 
+// Classic always seats 4; variant clamps the requested seats into the 5..7 range.
+/** Parse seat count for variant rooms (classic is always 4). */
 function parseMaxPlayers(v, mode, fallback) {
   if (mode !== 'variant') return CLASSIC_PLAYERS;
   const fb = fallback || 6;
@@ -81,12 +103,16 @@ function parseMaxPlayers(v, mode, fallback) {
   return Math.min(MAX_PLAYERS, Math.max(MIN_VARIANT_PLAYERS, n));
 }
 
+/** Short display label for a room, e.g. "Classic" or "Darbar 6P". */
 function modeLabel(room) {
   if (!room || room.mode !== 'variant') return 'Classic';
   return `Darbar ${room.maxPlayers}P`;
 }
 
 // Role chits per mode / seats. Classic is frozen (4). Variant adds court roles.
+// Full court order guarantees core roles (Raja/Mantri/Sipahi/Chor) are dealt first,
+// then Senapati/Kotwal/Praja as seats grow; sliced to the actual seat count.
+/** Ordered role chits for a room, sliced to its seat count. */
 function roleSetFor(room) {
   if (!room || room.mode !== 'variant') return ['raja', 'mantri', 'chor', 'sipahi'];
   const n = room.players ? Math.max(room.players.length, room.maxPlayers || 0) : (room.maxPlayers || 6);
@@ -95,6 +121,9 @@ function roleSetFor(room) {
   return full.slice(0, Math.min(MAX_PLAYERS, Math.max(MIN_VARIANT_PLAYERS, n || 6)));
 }
 
+// Who the Sipahi may accuse this round.
+// Classic: everyone except Sipahi. Variant: only hidden players (Raja/Mantri/Sipahi are public).
+/** Players the Sipahi is allowed to guess, as { id, name, isBot } list. */
 function suspectsFor(room) {
   const sipahi = room.players.find(p => room.roles[p.id] === 'sipahi');
   if (room.mode === 'variant') {
@@ -108,6 +137,8 @@ function suspectsFor(room) {
   return room.players.filter(p => p.id !== sipahi.id).map(p => ({ id: p.id, name: p.name, isBot: p.isBot }));
 }
 
+// Variant only: court roles shown publicly after the peek (Raja/Mantri/Sipahi).
+/** Publicly revealed players for Darbar variant (empty list in classic). */
 function revealedFor(room) {
   if (room.mode !== 'variant') return [];
   return room.players
@@ -115,12 +146,16 @@ function revealedFor(room) {
     .map(p => ({ id: p.id, name: p.name, role: room.roles[p.id], isBot: p.isBot }));
 }
 
+// Larger Darbar courts get a little more thinking time: 30s + 5s per suspect beyond 3.
+/** Guess timer seconds for a room (scales with variant court size). */
 function guessSecondsFor(room) {
   if (room.mode !== 'variant') return GUESS_SECONDS;
   const nSus = Math.max(2, (room.players.length || 0) - 3);
   return GUESS_SECONDS + Math.max(0, nSus - 3) * 5;
 }
 
+// 4-char room code from unambiguous alphabet (no 0/O, 1/I). Retries on collision.
+/** Generate a unique 4-letter room code. */
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -130,14 +165,17 @@ function genCode() {
 }
 
 // Cryptographically-strong random int in [0, max)
+/** Crypto-secure random int in [0, max) — used for shuffles, codes, bot picks. */
 function randInt(max) {
   return crypto.randomInt(max);
 }
 
+/** Random element from a non-empty array. */
 function pickRandom(arr) {
   return arr[randInt(arr.length)];
 }
 
+/** Fisher–Yates shuffle (crypto-backed) — returns a new array. */
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -150,6 +188,7 @@ function shuffle(arr) {
 // Deal chits so nobody gets the same role two rounds in a row (whenever
 // possible). Pure Math.random() streaks made repeats feel rigged, so we
 // re-shuffle until the deal differs from last round for every seated player.
+/** Shuffle and assign one role per seated player, minimising repeats of last round. */
 function dealRoles(room) {
   const base = roleSetFor(room).slice(0, room.players.length);
   let best = shuffle(base);
@@ -165,6 +204,7 @@ function dealRoles(room) {
   return roles;
 }
 
+/** Count how many seated players would repeat last round's role under `deal`. */
 function countRepeats(room, deal) {
   if (!room.lastRoles) return 0;
   let n = 0;
@@ -174,6 +214,7 @@ function countRepeats(room, deal) {
   return n;
 }
 
+/** Safe public snapshot of players for clients (never leaks socket internals or roles). */
 function publicPlayers(room) {
   return room.players.map(p => ({
     id: p.id, name: p.name, isBot: p.isBot,
@@ -182,6 +223,7 @@ function publicPlayers(room) {
   }));
 }
 
+/** Push the lobby roster/settings to everyone in the room. */
 function broadcastLobby(room) {
   io.to(room.code).emit('roomUpdate', {
     code: room.code,
@@ -195,6 +237,7 @@ function broadcastLobby(room) {
   });
 }
 
+/** Compact card for the open-room browser (no roles/scores leaked). */
 function roomCard(r) {
   return {
     code: r.code,
@@ -207,6 +250,7 @@ function roomCard(r) {
   };
 }
 
+/** Broadcast joinable lobby rooms (with a free human seat) to every connected client. */
 function broadcastPublicRooms() {
   const list = [...rooms.values()]
     .filter(r => r.status === 'lobby' && r.players.filter(p => !p.isBot).length < (r.maxPlayers || CLASSIC_PLAYERS))
@@ -215,12 +259,14 @@ function broadcastPublicRooms() {
 }
 
 // ---- Room chat (in-memory, last CHAT_HISTORY messages per room) ----
+/** Append a chat message (trimmed to CHAT_HISTORY) and emit it to the room. */
 function pushChat(room, msg) {
   room.messages.push(msg);
   if (room.messages.length > CHAT_HISTORY) room.messages.splice(0, room.messages.length - CHAT_HISTORY);
   io.to(room.code).emit('chatMsg', msg);
 }
 
+/** Game-event feed line (joins, catches, winners) shown inside room chat. */
 function sysMsg(room, text) {
   pushChat(room, { id: 'm_' + Date.now().toString(36) + randInt(1296).toString(36), sys: true, text, ts: Date.now() });
 }
@@ -232,12 +278,17 @@ function announce(room, type, text) {
   io.to(room.code).emit('playerEvent', { type, text, ts: Date.now() });
 }
 
+/** Clear any pending reveal/guess/bot timers so phases never overlap or leak. */
 function clearTimers(room) {
   if (room.revealTimer) { clearTimeout(room.revealTimer); room.revealTimer = null; }
   if (room.guessTimer) { clearTimeout(room.guessTimer); room.guessTimer = null; }
   if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
 }
 
+/**
+ * Begin a round: deal private chits, notify each human of their own role,
+ * announce the round to the room, and arm the 7s reveal -> guess transition.
+ */
 function startRound(room) {
   clearTimers(room);
   room.status = 'reveal';
@@ -280,6 +331,10 @@ function startRound(room) {
   room.revealTimer = setTimeout(() => openGuessPhase(room), REVEAL_SECONDS * 1000);
 }
 
+/**
+ * Hide chits and open the guessing phase: emits suspects (+ public reveals in
+ * variant), then arms either a bot auto-guess or the human Sipahi timeout.
+ */
 function openGuessPhase(room) {
   if (room.status !== 'reveal') return;
   room.status = 'guess';
@@ -313,6 +368,11 @@ function openGuessPhase(room) {
   }
 }
 
+/**
+ * Score a Sipahi accusation and reveal all chits.
+ * Correct: Sipahi +500, Chor +0. Wrong: swapped (Chor +500, Sipahi +0).
+ * Fixed court roles (Raja/Mantri/Senapati/Kotwal/Praja) always score face value.
+ */
 function resolveGuess(room, sipahiId, suspectId, auto = false) {
   if (room.status !== 'guess') return;
   clearTimers(room);
@@ -361,6 +421,10 @@ function resolveGuess(room, sipahiId, suspectId, auto = false) {
 }
 
 // ---------------- Socket handlers ----------------
+// Client -> server events: createRoom/joinRoom, sendChat, updateSettings,
+// addBot/removeBot, startGame, makeGuess, nextRound, endGame, restartGame, leaveRoom.
+// Server -> client events: joined, roomUpdate, publicRooms, roundAnnounce,
+// roundStarted, guessPhase, roundResult, gameOver, roundsUpdated, chatMsg, playerEvent, errorMsg.
 io.on('connection', (socket) => {
   socket.emit('publicRooms', [...rooms.values()]
     .filter(r => r.status === 'lobby')
@@ -581,6 +645,8 @@ io.on('connection', (socket) => {
     leaveRoom(socket);
   });
 
+  // Remove a human from a room. Lobby: player leaves (host migrates, empty room deleted).
+  // Mid-game: player becomes a bot stand-in so the round can finish; Sipahi leavers auto-guess.
   function leaveRoom(sock) {
     const code = sock.data.roomCode;
     const pid = sock.data.playerId;

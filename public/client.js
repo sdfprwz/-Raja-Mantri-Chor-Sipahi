@@ -1,3 +1,12 @@
+/**
+ * 👑 Raja Mantri Chor Sipahi — browser client (vanilla JS + Socket.IO).
+ *
+ * Screens: #screen-home (landing slider + create/join) -> #screen-lobby (QR invite,
+ * seats, bots, rounds) -> #screen-game (chit reveal -> guess -> result -> podium).
+ *
+ * Server connection: same-origin on web; when installed / wrapped native (see pwa.js),
+ * connects to the hosted backend URL instead. No build step, no framework.
+ */
 // Same-origin on web; hosted backend URL when running as installed/native app.
 const socket = (function () {
   try {
@@ -9,11 +18,13 @@ const socket = (function () {
 
 const $ = (id) => document.getElementById(id);
 const screens = ['screen-home', 'screen-lobby', 'screen-game'];
+/** Show one full-screen view and hide the others. */
 function show(name) {
   screens.forEach(s => $(s).classList.add('hidden'));
   $(name).classList.remove('hidden');
   window.scrollTo(0, 0);
 }
+/** Small bottom toast notification (auto-hides after ~2.5s). */
 function toast(msg) {
   const t = $('toast');
   t.textContent = msg;
@@ -22,6 +33,7 @@ function toast(msg) {
   t._h = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// Role art + scoring hints. img may be null (emoji-only roles: Senapati/Kotwal/Praja).
 const ROLE_META = {
   raja:   { emoji: '👑', name: 'RAJA',   pts: '1000 pts (fixed)', img: 'assets/raja.jpg' },
   mantri: { emoji: '🎩', name: 'MANTRI', pts: '800 pts (fixed)', img: 'assets/mantari.jpg' },
@@ -31,6 +43,7 @@ const ROLE_META = {
   kotwal: { emoji: '🛡️', name: 'KOTWAL', pts: '400 pts (fixed)', img: null },
   praja:  { emoji: '🧑‍🌾', name: 'PRAJA',  pts: '200 pts (fixed)', img: null },
 };
+/** Swap the chit artwork for a role (hides <img> when no art exists so emoji shows). */
 function setChitImg(role) {
   const img = document.getElementById('chitImg');
   if (!img) return;
@@ -111,17 +124,22 @@ $('btnSound').onclick = () => {
 
 // ---------------- Rounds: free choice 1..500 + ♾️ endless (0) ----------------
 const MAX_ROUNDS = 500;
+/** Short room label, e.g. "Classic 4P" or "Darbar 6P". */
 function fmtMode(mode, maxPlayers) {
   return mode === 'variant' ? `Darbar ${maxPlayers || 6}P` : 'Classic 4P';
 }
+/** Reflect the current mode in the lobby + game badges. */
 function setModeBadges() {
   const t = fmtMode(curMode, curMaxPlayers);
   const lb = $('lbMode'), g = $('gMode');
   if (lb) { lb.textContent = t; lb.style.display = ''; }
   if (g) { g.textContent = t; }
 }
+/** Human label for total rounds; 0 means endless. */
 function fmtRounds(t) { return (!t || t === 0) ? '♾️ endless' : `${t} round${t === 1 ? '' : 's'}`; }
+/** In-game header label, e.g. "Round 3/5" or "Round 3 / ♾️". */
 function fmtRoundLabel(round, total) { return (!total || total === 0) ? `Round ${round} / ♾️` : `Round ${round}/${total}`; }
+/** Read the rounds picker (number + endless checkbox), clamped to 1..MAX_ROUNDS; 0 = endless. */
 function readRounds(numEl, endEl, fallback) {
   if (endEl && endEl.checked) return 0;
   let n = parseInt(numEl && numEl.value, 10);
@@ -131,6 +149,7 @@ function readRounds(numEl, endEl, fallback) {
   if (n > MAX_ROUNDS) n = MAX_ROUNDS;
   return n;
 }
+/** Sync a rounds picker UI (disables the number input when endless is checked). */
 function setRoundsUI(numEl, endEl, total) {
   const endless = !total || total === 0;
   if (endEl) endEl.checked = endless;
@@ -228,9 +247,11 @@ socket.on('joined', (d) => {
 });
 let prevPlayerCount = 0;
 // ---- QR invite: link + scannable code (no manual code sharing needed) ----
+/** Deep-link invite URL for a room code (scanned QR opens this; ?room= pre-fills join). */
 function getInviteLink(code) {
   return `${window.location.origin}/?room=${encodeURIComponent(code)}`;
 }
+/** Render the invite link input + scannable QR code for a room. */
 function renderInvite(code) {
   if (!code) return;
   const link = getInviteLink(code);
@@ -368,7 +389,8 @@ $('btnStart').onclick = () => { Sound.play('click'); socket.emit('startGame'); }
 $('btnLeave1').onclick = () => { socket.emit('leaveRoom'); location.reload(); };
 $('btnLeave2').onclick = () => { socket.emit('leaveRoom'); location.reload(); };
 
-// host mid-game controls
+// host mid-game controls (visible to host only): extend/shorten rounds or finish early.
+/** Show the host-only mid-game bar (rounds override + end game) during active play. */
 function refreshMidGame() {
   $('midGameControls').classList.toggle('hidden', !isHost);
 }
@@ -430,6 +452,7 @@ socket.on('roundStarted', (d) => {
   showChit(myRole, d.revealSeconds);
 });
 
+/** Live scoreboard chips sorted by total score (current leader first). */
 function renderScores(players) {
   const bar = $('scorebar');
   bar.innerHTML = '';
@@ -441,6 +464,7 @@ function renderScores(players) {
   });
 }
 
+/** Show my secret chit for `secs` seconds, then auto-hide (anti-sneak). */
 function showChit(role, secs) {
   const meta = ROLE_META[role] || { emoji: '❓', name: String(role).toUpperCase(), pts: '' };
   const card = $('chitCard');
@@ -467,6 +491,7 @@ function showChit(role, secs) {
   }, 1000);
 }
 
+/** Hide the chit (shows a card back) and offer the 2s Peek button. */
 function hideChit(auto = true) {
   const card = $('chitCard');
   card.classList.add('hidden-chit');
@@ -676,6 +701,7 @@ function updateBadge() {
   b.textContent = unread > 9 ? '9+' : unread;
   b.classList.toggle('hidden', unread === 0);
 }
+/** Append one chat/game-event line to the room chat panel (capped at 50). */
 function addChatMsg(m) {
   const box = $('chatMsgs');
   const div = document.createElement('div');
@@ -698,6 +724,7 @@ socket.on('chatMsg', (m) => {
   if (!chatOpen) { unread++; updateBadge(); }
   if (!m.sys && m.playerId !== myId) Sound.play('chat');
 });
+/** Open/close the floating room-chat panel (resets the unread badge when opened). */
 function setChat(open) {
   chatOpen = open;
   $('chatPanel').classList.toggle('hidden', !open);
@@ -719,6 +746,7 @@ socket.on('errorMsg', (m) => toast(m));
 socket.on('connect', () => { $('connDot').className = 'dot online'; $('connText').textContent = 'connected'; });
 socket.on('disconnect', () => { $('connDot').className = 'dot off'; $('connText').textContent = 'disconnected'; });
 
+/** Escape user text (names/chat) before injecting into the DOM — prevents HTML injection. */
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

@@ -1,3 +1,9 @@
+/**
+ * 👑 Raja Mantri Chor Sipahi — app styles (vanilla CSS, no framework).
+ * Theme: dark royal court (purple/gold). Layout: topbar + centered .wrap + cards
+ * for home slider / lobby / game, plus floating chat, toasts, QR share box,
+ * chit reveal/guess/result states, and the Darbar variant reveal strip.
+ */
 :root{
   --bg:#141021; --card:#221b3a; --card2:#2c2350; --gold:#f5c542; --ink:#f4efff;
   --muted:#b9b0d8; --acc:#7c5cff; --good:#37d67a; --bad:#ff5d5d;
