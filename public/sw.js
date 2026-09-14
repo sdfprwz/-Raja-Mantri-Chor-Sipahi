@@ -1,5 +1,5 @@
 /* Raja Mantri Chor Sipahi — PWA service worker */
-const CACHE_VERSION = 'rmcs-v1';
+const CACHE_VERSION = 'rmcs-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 // App shell — cached on install. socket.io + API + rooms stay network-only.
 const APP_SHELL = [
