@@ -1,0 +1,12 @@
+{
+  "appId": "com.rajamantri.app",
+  "appName": "Raja Mantri Chor Sipahi",
+  "webDir": "public",
+  "backgroundColor": "#141021",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

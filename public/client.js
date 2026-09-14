@@ -1,4 +1,11 @@
-const socket = io();
+// Same-origin on web; hosted backend URL when running as installed/native app.
+const socket = (function () {
+  try {
+    const u = (typeof window.getServerUrl === 'function' ? window.getServerUrl() : window.RMCS_SERVER_URL) || '';
+    if (u && /^https?:\/\//i.test(u)) return io(u, { transports: ['websocket', 'polling'] });
+  } catch (_) {}
+  return io();
+})();
 
 const $ = (id) => document.getElementById(id);
 const screens = ['screen-home', 'screen-lobby', 'screen-game'];

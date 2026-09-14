@@ -2,10 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>👑 Raja Mantri Chor Sipahi — Online</title>
+<meta name="description" content="Raja Mantri Chor Sipahi — classic Indian chit game, online multiplayer with friends + bots. Free." />
+<meta name="theme-color" content="#141021" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="RajaMantri" />
+<!-- Native builds inject production server here: <meta name="rmcs-server" content="https://your-app.onrender.com"> -->
+<meta name="rmcs-server" content="" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 <link rel="stylesheet" href="style.css" />
 <script src="/socket.io/socket.io.js"></script>
+<script src="pwa.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
@@ -15,6 +29,7 @@
 <header class="topbar">
   <div class="brand">👑 Raja · Mantri · Chor · Sipahi</div>
   <div class="top-right">
+    <button id="btnInstall" class="btn small hidden" title="Install app">📲 Install</button>
     <a class="profile" href="https://github.com/sdfprwz" target="_blank" rel="noopener" title="Made by sdfprwz">👤 sdfprwz</a>
     <button id="btnSound" class="btn small sound-btn" title="Toggle sound">🔊</button>
     <span id="connDot" class="dot online"></span><span id="connText">connected</span>
@@ -230,7 +245,7 @@
   </div>
 </main>
 
-<footer class="foot">Made with ❤️ by <a href="https://github.com/sdfprwz" target="_blank" rel="noopener">sdfprwz</a> · Raja 1000 · Mantri 800 · Sipahi/Chor 500/0</footer>
+<footer class="foot">Made with ❤️ by <a href="https://github.com/sdfprwz" target="_blank" rel="noopener">sdfprwz</a> · Raja 1000 · Mantri 800 · Sipahi/Chor 500/0 · <a href="/privacy-policy.html">Privacy</a></footer>
 <script src="client.js"></script>
 </body>
 </html>

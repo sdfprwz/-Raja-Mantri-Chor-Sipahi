@@ -10,8 +10,20 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  dotfiles: 'allow',
+  setHeaders: (res, filePath) => {
+    // Service worker must not be cached or updates get stuck.
+    if (filePath.endsWith('sw.js')) res.set('Cache-Control', 'no-cache');
+  }
+}));
 app.get('/health', (req, res) => res.json({ ok: true }));
+// Play Store (TWA) domain verification — fill public/.well-known/assetlinks.json at publish time.
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', '.well-known', 'assetlinks.json'), (err) => {
+    if (err) res.json([]);
+  });
+});
 // Missing game art should 404 (so <img onerror> fallback works) — not serve index.html
 app.get('/assets/*', (req, res) => res.status(404).send('not found'));
 // SPA fallback for any non-socket route (deep-link ?room= support)

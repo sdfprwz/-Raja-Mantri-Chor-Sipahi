@@ -4,7 +4,15 @@
   "description": "Traditional Indian game Raja Mantri Chor Sipahi - multiplayer online with rooms and bots",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "cap:init": "cap init \"Raja Mantri Chor Sipahi\" com.rajamantri.app --web-dir=public",
+    "cap:add:android": "cap add android",
+    "cap:add:ios": "cap add ios",
+    "cap:sync": "cap sync",
+    "cap:open:android": "cap open android",
+    "cap:open:ios": "cap open ios",
+    "build:android": "cap sync android",
+    "build:ios": "cap sync ios"
   },
   "engines": {
     "node": ">=18"
@@ -12,5 +20,11 @@
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/ios": "^6.1.0"
   }
 }
